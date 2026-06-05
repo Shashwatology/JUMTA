@@ -1,12 +1,12 @@
-# UMTAJ: Jaipur Mobility Data Architecture & Transit Strategy Report
+# JUMTA: Jaipur Mobility Data Architecture & Transit Strategy Report
 
-This document presents the validated transport data models, GTFS feed design, API strategy, and network verification logic for the Unified Mobility & Transport Authority Jaipur (UMTAJ). It establishes the technical blueprint for the multi-criteria transit routing engine.
+This document presents the validated transport data models, GTFS feed design, API strategy, and network verification logic for the Jaipur Unified Mobility & Transport Authority (JUMTA). It establishes the technical blueprint for the multi-criteria transit routing engine.
 
 ---
 
 ## 1. Unified Mobility Data Architecture
 
-To prevent fictional routes or direct "teleportation" between unconnected nodes, UMTAJ adopts a graph-based network data model. The physical city layout is represented as a directed graph $G = (V, E)$ where:
+To prevent fictional routes or direct "teleportation" between unconnected nodes, JUMTA adopts a graph-based network data model. The physical city layout is represented as a directed graph $G = (V, E)$ where:
 *   $V$ contains all physical stops ($V_{\text{stops}}$) and points of interest ($V_{\text{poi}}$).
 *   $E$ contains all route connections ($E_{\text{transit}}$) and walking transfer links ($E_{\text{walk}}$).
 
@@ -45,7 +45,7 @@ Every stop in the system is classified by mode and coordinate bounds.
 
 ## 2. GTFS & GTFS-Realtime Strategy
 
-UMTAJ consolidates transit timetables and live tracking using the **General Transit Feed Specification (GTFS)** standard.
+JUMTA consolidates transit timetables and live tracking using the **General Transit Feed Specification (GTFS)** standard.
 
 ### Static GTFS Feeds
 1.  **`agency.txt`**: Maps JMRC (Metro Phase 1 & 2) and JCTSL (City Buses).

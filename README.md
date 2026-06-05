@@ -1,6 +1,6 @@
-# JUMTA: Jaipur Urban Mobility and Transit Authority Platform 🚀
+# JUMTA: Jaipur Unified Mobility & Transport Authority Platform 🚀
 
-JUMTA (also referred to as **UMTAJ** in the system) is a next-generation **Mobility-as-a-Service (MaaS)** platform and transit routing engine built for the city of Jaipur. It is designed to unify diverse transit modes—including the JMRC Metro (Phase 1 & 2), JCTSL City Buses, e-rickshaw feeder services, cycle sharing, and pedestrian networks—into a single, seamless passenger portal.
+JUMTA (Jaipur Unified Mobility & Transport Authority) is a next-generation **Mobility-as-a-Service (MaaS)** platform and transit routing engine built for the city of Jaipur. It is designed to unify diverse transit modes—including the JMRC Metro (Phase 1 & 2), JCTSL City Buses, e-rickshaw feeder services, cycle sharing, and pedestrian networks—into a single, seamless passenger portal.
 
 With a motto of **"One City. One Ticket."**, JUMTA provides smart multi-modal routing, unified ticketing using cryptographically signed QR codes, real-time GPS tracking, and an AI-adaptive network controller for demand prediction.
 
@@ -182,6 +182,6 @@ The production bundle will be generated in the `dist/` directory.
 ---
 
 ## 📄 Licensing & Support
-This project is developed for the **Unified Mobility & Transport Authority Jaipur (UMTAJ)**. 
+This project is developed for the **Jaipur Unified Mobility & Transport Authority (JUMTA)**. 
 
 For inquiries, support, or API integrations, contact the JUMTA Engineering Division or open an issue in this repository.

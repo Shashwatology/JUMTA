@@ -10,6 +10,7 @@ import {
 import { 
   XAxis, ResponsiveContainer, BarChart, Bar 
 } from 'recharts';
+import jumtaLogo from './assets/jumta_logo.png';
 
 export default function App() {
   const store = useMaaSStore();
@@ -33,7 +34,7 @@ export default function App() {
   // General Interactive States
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string; textHi?: string }>>([
-    { sender: 'ai', text: 'Namaste! I am your UMTAJ AI Assistant. Where do you want to travel in Jaipur today?', textHi: 'नमस्ते! मैं आपका उमताज एआई सहायक हूँ। आज आप जयपुर में कहाँ यात्रा करना चाहते हैं?' }
+    { sender: 'ai', text: 'Namaste! I am your JUMTA AI Assistant. Where do you want to travel in Jaipur today?', textHi: 'नमस्ते! मैं आपका जुम्टा एआई सहायक हूँ। आज आप जयपुर में कहाँ यात्रा करना चाहते हैं?' }
   ]);
   const [showControlSidebar, setShowControlSidebar] = useState(false);
   const [rechargeAmt, setRechargeAmt] = useState('100');
@@ -583,18 +584,13 @@ export default function App() {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            {/* Minimal Vector Logo: Location pin U shape */}
-            <svg viewBox="0 0 100 100" className="w-9 h-9" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M50 90C70 65 85 45 85 28C85 12 70 2 50 2C30 2 15 12 15 28C15 45 30 65 50 90Z" fill="#D65A6F" />
-              <path d="M50 48C58 48 64 42 64 34C64 26 58 20 50 20C42 20 36 26 36 34C36 42 42 48 50 48Z" fill="#FFFFFF" />
-              <path d="M40 28V36C40 42 44 46 50 46C56 46 60 42 60 36V28" stroke="#185FA5" strokeWidth="4" strokeLinecap="round" />
-            </svg>
+            <img src={jumtaLogo} alt="JUMTA Logo" className="w-9 h-9 object-contain rounded-lg" />
             <div>
               <h1 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-baseline gap-1">
-                <span>UMTAJ</span>
+                <span>JUMTA</span>
                 <span className="text-[10px] text-slate-400 font-normal">One City. One Ticket.</span>
               </h1>
-              <p className="text-xs text-slate-500 font-light">Jaipur Mobility-as-a-Service Platform</p>
+              <p className="text-xs text-slate-500 font-light">Jaipur Unified Mobility &amp; Transport Authority</p>
             </div>
           </div>
         </div>
@@ -625,7 +621,7 @@ export default function App() {
               <div className="flex items-center gap-1.5">
                 <Wifi className="w-3.5 h-3.5 text-slate-700" />
                 <span className="font-bold text-[9px] text-slate-700">5G</span>
-                <span className="font-semibold text-slate-700">UMTAJ</span>
+                <span className="font-semibold text-slate-700">JUMTA</span>
               </div>
             </div>
 
@@ -636,12 +632,8 @@ export default function App() {
               {store.authStep === 'splash' && (
                 <div className="flex-grow flex flex-col items-center justify-center gap-6 py-10 bg-white">
                   <div className="flex flex-col items-center gap-3 animate-pulse">
-                    <svg viewBox="0 0 100 100" className="w-20 h-20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M50 90C70 65 85 45 85 28C85 12 70 2 50 2C30 2 15 12 15 28C15 45 30 65 50 90Z" fill="#D65A6F" />
-                      <path d="M50 48C58 48 64 42 64 34C64 26 58 20 50 20C42 20 36 26 36 34C36 42 42 48 50 48Z" fill="#FFFFFF" />
-                      <path d="M40 28V36C40 42 44 46 50 46C56 46 60 42 60 36V28" stroke="#185FA5" strokeWidth="4" strokeLinecap="round" />
-                    </svg>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">UMTAJ</h2>
+                    <img src={jumtaLogo} alt="JUMTA Logo" className="w-20 h-20 object-contain rounded-2xl shadow-sm" />
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">JUMTA</h2>
                     <span className="text-xs text-slate-500 font-bold tracking-widest uppercase">One City. One Ticket.</span>
                   </div>
                   {/* Skyline moving simulation */}
@@ -655,10 +647,7 @@ export default function App() {
               {store.authStep === 'welcome' && (
                 <div className="flex-grow flex flex-col justify-between py-6 bg-white px-2">
                   <div className="flex flex-col items-center text-center gap-4 mt-8">
-                    <svg viewBox="0 0 100 100" className="w-16 h-16" fill="none">
-                      <path d="M50 90C70 65 85 45 85 28C85 12 70 2 50 2C30 2 15 12 15 28C15 45 30 65 50 90Z" fill="#D65A6F" />
-                      <path d="M50 48C58 48 64 42 64 34C64 26 58 20 50 20C42 20 36 26 36 34C36 42 42 48 50 48Z" fill="#FFFFFF" />
-                    </svg>
+                    <img src={jumtaLogo} alt="JUMTA Logo" className="w-16 h-16 object-contain rounded-2xl shadow-sm" />
                     <h2 className="text-2xl font-black text-slate-900 leading-tight">Travel Across Jaipur Seamlessly</h2>
                     <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
                       Metro, buses, auto-rickshaws, and cabs. All integrated under one account.
@@ -1486,7 +1475,7 @@ export default function App() {
             <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-md flex flex-col gap-4">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="text-base font-black text-slate-800">UMTAJ Command Center</h3>
+                  <h3 className="text-base font-black text-slate-800">JUMTA Command Center</h3>
                   <p className="text-[10px] text-slate-400 font-light">Network telemetry and GNN hotspot predictors</p>
                 </div>
                 <span className="bg-transit-green/15 text-transit-green border border-transit-green/20 px-2 py-0.5 rounded text-[8px] font-bold">
