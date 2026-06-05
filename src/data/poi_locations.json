@@ -1,0 +1,83 @@
+[
+  {
+    "id": "POI_ARAVALI_HOSTEL",
+    "nameEn": "Aravali Hostel, MNIT Campus",
+    "nameHi": "अरावली हॉस्टल, एमएनआईटी परिसर",
+    "lat": 26.861500,
+    "lng": 75.803000,
+    "nearestBusStopId": "B_MNIT",
+    "nearestMetroStationId": "M2_MNIT"
+  },
+  {
+    "id": "POI_MNIT",
+    "nameEn": "MNIT Jaipur Campus",
+    "nameHi": "एमएनआईटी जयपुर परिसर",
+    "lat": 26.866198,
+    "lng": 75.807918,
+    "nearestBusStopId": "B_MNIT",
+    "nearestMetroStationId": "M2_MNIT"
+  },
+  {
+    "id": "POI_WTP",
+    "nameEn": "World Trade Park (WTP)",
+    "nameHi": "वर्ल्ड ट्रेड पार्क",
+    "lat": 26.862400,
+    "lng": 75.818800,
+    "nearestBusStopId": "B_WTP",
+    "nearestMetroStationId": "M2_NEHRU_PLACE"
+  },
+  {
+    "id": "POI_AIRPORT",
+    "nameEn": "Jaipur International Airport",
+    "nameHi": "जयपुर अंतर्राष्ट्रीय हवाई अड्डा",
+    "lat": 26.828500,
+    "lng": 75.812200,
+    "nearestBusStopId": "B_DURGAPURA",
+    "nearestMetroStationId": "M2_DURGAPURA"
+  },
+  {
+    "id": "POI_SMS_HOSPITAL",
+    "nameEn": "SMS Hospital & Medical College",
+    "nameHi": "एसएमएस अस्पताल",
+    "lat": 26.903200,
+    "lng": 75.812400,
+    "nearestBusStopId": "B_NS_CIRCLE",
+    "nearestMetroStationId": "M2_NSCIR"
+  },
+  {
+    "id": "POI_RAILWAY",
+    "nameEn": "Jaipur Junction Railway Station",
+    "nameHi": "जयपुर जंक्शन रेलवे स्टेशन",
+    "lat": 26.918000,
+    "lng": 75.793000,
+    "nearestBusStopId": "B_RAILWAY",
+    "nearestMetroStationId": "M_RAILWAY"
+  },
+  {
+    "id": "POI_JECC",
+    "nameEn": "JECC Sitapura",
+    "nameHi": "जेईसीसी सीतापुरा",
+    "lat": 26.804000,
+    "lng": 75.858000,
+    "nearestBusStopId": "B_SITAPURA",
+    "nearestMetroStationId": "M2_JECC"
+  },
+  {
+    "id": "POI_HAWA_MAHAL",
+    "nameEn": "Hawa Mahal",
+    "nameHi": "हवा महल",
+    "lat": 26.927000,
+    "lng": 75.831000,
+    "nearestBusStopId": "B_BADI_CHAUPAR",
+    "nearestMetroStationId": "M_BADI_CHAUPAR"
+  },
+  {
+    "id": "POI_ALBERT_HALL",
+    "nameEn": "Albert Hall Museum",
+    "nameHi": "अल्बर्ट हॉल संग्रहालय",
+    "lat": 26.911500,
+    "lng": 75.819000,
+    "nearestBusStopId": "B_AJMERI_GATE",
+    "nearestMetroStationId": "M2_AJG"
+  }
+]

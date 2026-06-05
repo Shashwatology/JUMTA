@@ -1,0 +1,17 @@
+[
+  { "id": "INT_SINDHI_CAMP", "name": "Sindhi Camp Interchange", "fromStopId": "M_SINDHI_CAMP", "toStopId": "B_SINDHI_CAMP", "distanceMeters": 80, "walkTimeMins": 1.5, "accessible": true },
+  { "id": "INT_RAILWAY", "name": "Railway Station Interchange", "fromStopId": "M_RAILWAY", "toStopId": "B_RAILWAY", "distanceMeters": 50, "walkTimeMins": 1.0, "accessible": true },
+  { "id": "INT_CHANDPOLE", "name": "Chandpole Interchange", "fromStopId": "M_CHANDPOLE", "toStopId": "B_CHANDPOLE", "distanceMeters": 60, "walkTimeMins": 1.2, "accessible": true },
+  { "id": "INT_BADI_CHAUPAR", "name": "Badi Chaupar Interchange", "fromStopId": "M_BADI_CHAUPAR", "toStopId": "B_BADI_CHAUPAR", "distanceMeters": 70, "walkTimeMins": 1.4, "accessible": true },
+  { "id": "INT_B2_BYPASS", "name": "B2 Bypass Circle Interchange (Ph2)", "fromStopId": "M2_B2_BYPASS", "toStopId": "B_B2_BYPASS", "distanceMeters": 40, "walkTimeMins": 0.8, "accessible": true },
+  { "id": "INT_DURGAPURA", "name": "Durgapura Interchange (Ph2)", "fromStopId": "M2_DURGAPURA", "toStopId": "B_DURGAPURA", "distanceMeters": 30, "walkTimeMins": 0.6, "accessible": true },
+  { "id": "INT_GOPALPURA", "name": "Gopalpura Interchange (Ph2)", "fromStopId": "M2_GOPALPURA", "toStopId": "B_GOPALPURA", "distanceMeters": 30, "walkTimeMins": 0.6, "accessible": true },
+  { "id": "INT_MNIT", "name": "MNIT Interchange (Ph2)", "fromStopId": "M2_MNIT", "toStopId": "B_MNIT", "distanceMeters": 30, "walkTimeMins": 0.6, "accessible": true },
+  { "id": "INT_GLA", "name": "Tonk Phatak Interchange (Ph2)", "fromStopId": "M2_GLA", "toStopId": "B_TONK_PHATAK", "distanceMeters": 40, "walkTimeMins": 0.8, "accessible": true },
+  { "id": "INT_RBC", "name": "Rambagh Circle Interchange (Ph2)", "fromStopId": "M2_RBC", "toStopId": "B_RAMBAGH", "distanceMeters": 45, "walkTimeMins": 0.9, "accessible": true },
+  { "id": "INT_NSCIR", "name": "Narayan Singh Circle Interchange (Ph2)", "fromStopId": "M2_NSCIR", "toStopId": "B_NS_CIRCLE", "distanceMeters": 40, "walkTimeMins": 0.8, "accessible": true },
+  { "id": "INT_AJG", "name": "Ajmeri Gate Interchange (Ph2)", "fromStopId": "M2_AJG", "toStopId": "B_AJMERI_GATE", "distanceMeters": 50, "walkTimeMins": 1.0, "accessible": true },
+  { "id": "INT_KHASA_KOTHI", "name": "Khasa Kothi Interchange (Ph2)", "fromStopId": "M2_KHASA_KOTHI", "toStopId": "B_KHASA_KOTHI", "distanceMeters": 30, "walkTimeMins": 0.6, "accessible": false },
+  { "id": "INT_COLLECTORATE", "name": "Collectorate Circle Interchange (Ph2)", "fromStopId": "M2_COLLECTORATE", "toStopId": "B_COLLECTORATE", "distanceMeters": 35, "walkTimeMins": 0.7, "accessible": true },
+  { "id": "INT_VIDHYADHAR", "name": "Vidhyadhar Nagar Interchange (Ph2)", "fromStopId": "M2_VIDHYADHAR", "toStopId": "B_VIDHYADHAR", "distanceMeters": 40, "walkTimeMins": 0.8, "accessible": true }
+]

@@ -1,0 +1,22 @@
+[
+  { "id": "M2_PRAHLADPURA", "nameEn": "Prahladpura", "nameHi": "प्रह्लादपुरा", "lat": 26.764012, "lng": 75.845012, "sequence": 1 },
+  { "id": "M2_GONER_MOD", "nameEn": "Goner Mod", "nameHi": "गोनेर मोड़", "lat": 26.782012, "lng": 75.850012, "sequence": 2 },
+  { "id": "M2_SITAPURA", "nameEn": "Sitapura Industrial Area", "nameHi": "सीतापुरा औद्योगिक क्षेत्र", "lat": 26.797012, "lng": 75.855012, "sequence": 3 },
+  { "id": "M2_JECC", "nameEn": "JECC Exhibition Centre", "nameHi": "जेईसीसी केंद्र", "lat": 26.804012, "lng": 75.858012, "sequence": 4 },
+  { "id": "M2_HALDIGHATI", "nameEn": "Haldighati Gate", "nameHi": "हल्दीघाटी गेट", "lat": 26.815012, "lng": 75.854012, "sequence": 5 },
+  { "id": "M2_SANGANER_PS", "nameEn": "Sanganer Police Station", "nameHi": "सांगानेर थाना", "lat": 26.824012, "lng": 75.842012, "sequence": 6 },
+  { "id": "M2_SANGANER", "nameEn": "Sanganer Town", "nameHi": "सांगानेर टाउन", "lat": 26.828012, "lng": 75.832012, "sequence": 7 },
+  { "id": "M2_B2_BYPASS", "nameEn": "B2 Bypass Circle", "nameHi": "बी2 बाईपास चौराहा", "lat": 26.843012, "lng": 75.815012, "sequence": 8 },
+  { "id": "M2_DURGAPURA", "nameEn": "Durgapura Rail Station", "nameHi": "दुर्गापुरा रेलवे स्टेशन", "lat": 26.852012, "lng": 75.812012, "sequence": 9 },
+  { "id": "M2_GOPALPURA", "nameEn": "Gopalpura Flyover", "nameHi": "गोपालपुरा फ्लाईओवर", "lat": 26.864012, "lng": 75.809012, "sequence": 10 },
+  { "id": "M2_MNIT", "nameEn": "MNIT Campus", "nameHi": "एमएनआईटी परिसर", "lat": 26.866198, "lng": 75.807918, "sequence": 11 },
+  { "id": "M2_GLA", "nameEn": "Tonk Phatak (GLA)", "nameHi": "टोंक फाटक (जीएलए)", "lat": 26.878012, "lng": 75.806012, "sequence": 12 },
+  { "id": "M2_NEHRU_PLACE", "nameEn": "Nehru Place", "nameHi": "नेहरू प्लेस", "lat": 26.891012, "lng": 75.809012, "sequence": 13 },
+  { "id": "M2_RBC", "nameEn": "Rambagh Circle", "nameHi": "रामबाग सर्किल", "lat": 26.898012, "lng": 75.808012, "sequence": 14 },
+  { "id": "M2_NSCIR", "nameEn": "Narayan Singh Circle", "nameHi": "नारायण सिंह सर्किल", "lat": 26.903012, "lng": 75.812012, "sequence": 15 },
+  { "id": "M2_AJG", "nameEn": "Ajmeri Gate", "nameHi": "अजमेरी गेट", "lat": 26.912412, "lng": 75.814412, "sequence": 16 },
+  { "id": "M2_KHASA_KOTHI", "nameEn": "Khasa Kothi Circle", "nameHi": "खासा कोठी चौराहा", "lat": 26.920012, "lng": 75.798012, "sequence": 17 },
+  { "id": "M2_COLLECTORATE", "nameEn": "Collectorate Circle", "nameHi": "कलेक्ट्रेट सर्किल", "lat": 26.928012, "lng": 75.795012, "sequence": 18 },
+  { "id": "M2_VIDHYADHAR", "nameEn": "Vidhyadhar Nagar", "nameHi": "विद्याधर नगर", "lat": 26.958012, "lng": 75.786012, "sequence": 19 },
+  { "id": "M2_TODI_MOD", "nameEn": "Todi Mod Terminus", "nameHi": "टोडी मोड़ टर्मिनस", "lat": 27.025012, "lng": 75.772012, "sequence": 20 }
+]

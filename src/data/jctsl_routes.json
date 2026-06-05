@@ -1,0 +1,86 @@
+[
+  {
+    "route_id": "R_3",
+    "route_name": "Route 3: Mansarovar ↔ Transport Nagar",
+    "route_type": "BUS",
+    "color": "#1D9E75",
+    "stops": [
+      "B_SANGANER_RLY",
+      "B_B2_BYPASS",
+      "B_DURGAPURA",
+      "B_GOPALPURA",
+      "B_MNIT",
+      "B_TONK_PHATAK",
+      "B_RAMBAGH",
+      "B_NS_CIRCLE",
+      "B_AJMERI_GATE",
+      "B_RAILWAY",
+      "B_SINDHI_CAMP",
+      "B_BADI_CHAUPAR",
+      "B_TRANS_NAGAR"
+    ]
+  },
+  {
+    "route_id": "R_7",
+    "route_name": "Route 7: Transport Nagar ↔ Ajmeri Gate",
+    "route_type": "BUS",
+    "color": "#1D9E75",
+    "stops": ["B_TRANS_NAGAR", "B_NS_CIRCLE", "B_AJMERI_GATE"]
+  },
+  {
+    "route_id": "R_11",
+    "route_name": "Route 11: Badi Chaupar ↔ Transport Nagar",
+    "route_type": "BUS",
+    "color": "#1D9E75",
+    "stops": ["B_BADI_CHAUPAR", "B_AJMERI_GATE", "B_TRANS_NAGAR"]
+  },
+  {
+    "route_id": "R_14",
+    "route_name": "Route 14: Railway ↔ Vidhyadhar Nagar",
+    "route_type": "BUS",
+    "color": "#1D9E75",
+    "stops": ["B_RAILWAY", "B_KHASA_KOTHI", "B_COLLECTORATE", "B_VIDHYADHAR"]
+  },
+  {
+    "route_id": "R_AC1",
+    "route_name": "AC Route 1: Kukas ↔ Sanganer",
+    "route_type": "BUS",
+    "color": "#0D684D",
+    "stops": [
+      "B_KUKAS",
+      "B_VIDHYADHAR",
+      "B_SINDHI_CAMP",
+      "B_AJMERI_GATE",
+      "B_NS_CIRCLE",
+      "B_RAMBAGH",
+      "B_TONK_PHATAK",
+      "B_MNIT",
+      "B_GOPALPURA",
+      "B_DURGAPURA",
+      "B_B2_BYPASS",
+      "B_SANGANER_TOWN",
+      "B_HALDIGHATI",
+      "B_SITAPURA"
+    ]
+  },
+  {
+    "route_id": "R_AC2",
+    "route_name": "AC Route 2: Gobindpura ↔ MGH",
+    "route_type": "BUS",
+    "color": "#0D684D",
+    "stops": [
+      "B_GOBINDPURA",
+      "B_RAILWAY",
+      "B_SINDHI_CAMP",
+      "B_AJMERI_GATE",
+      "B_RAMBAGH",
+      "B_TONK_PHATAK",
+      "B_MNIT",
+      "B_DURGAPURA",
+      "B_B2_BYPASS",
+      "B_HALDIGHATI",
+      "B_SITAPURA",
+      "B_MGH"
+    ]
+  }
+]
