@@ -10,6 +10,7 @@ import {
 import { 
   XAxis, ResponsiveContainer, BarChart, Bar 
 } from 'recharts';
+import { InteractiveMaaSMap } from './components/InteractiveMaaSMap';
 import jumtaLogo from './assets/jumta_logo.png';
 
 export default function App() {
@@ -38,6 +39,23 @@ export default function App() {
   ]);
   const [showControlSidebar, setShowControlSidebar] = useState(false);
   const [rechargeAmt, setRechargeAmt] = useState('100');
+  const [showSOSOverlay, setShowSOSOverlay] = useState(false);
+  const [validitySeconds, setValiditySeconds] = useState(6300);
+
+  useEffect(() => {
+    if (store.citizenScreen !== 'tracking') return;
+    const interval = setInterval(() => {
+      setValiditySeconds(prev => (prev > 0 ? prev - 1 : 6300));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [store.citizenScreen]);
+
+  const formatValidityTime = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h}h ${m}m ${s}s`;
+  };
 
   // Weather API state
   const [weatherData, setWeatherData] = useState<{ temp: number; icon: string; desc: string } | null>(null);
@@ -97,8 +115,15 @@ export default function App() {
       }
 
       // 2. Fetch Location Name from Nominatim
+      let locName = 'Jaipur Central';
       if (isDefault) {
-        setCurrentLocName('Jaipur Central (GPS Off)');
+        locName = 'Mansarovar Metro (GPS Off)';
+        setCurrentLocName(locName);
+        store.setUserLocation({ lat: 26.8770, lng: 75.7540, nameEn: locName });
+        const mStop = searchableLocations.find(s => s.id === 'M_MANSAROVAR');
+        if (mStop) setSelectedStartStop(mStop as any);
+        const bStop = searchableLocations.find(s => s.id === 'B_MNIT');
+        if (bStop) setSelectedEndStop(bStop as any);
       } else {
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
@@ -106,14 +131,40 @@ export default function App() {
           });
           const json = await res.json();
           if (json.address) {
-            const name = json.address.suburb || json.address.neighbourhood || json.address.city || json.address.town || 'Jaipur';
-            setCurrentLocName(name);
+            locName = json.address.suburb || json.address.neighbourhood || json.address.city || json.address.town || 'Jaipur';
+            setCurrentLocName(locName);
           } else {
-            setCurrentLocName('Jaipur');
+            locName = 'Jaipur';
+            setCurrentLocName(locName);
           }
         } catch (err) {
           console.error('Reverse geocoding error:', err);
-          setCurrentLocName('Jaipur (Geocode Offline)');
+          locName = 'Jaipur (Geocode Offline)';
+          setCurrentLocName(locName);
+        }
+        store.setUserLocation({ lat, lng, nameEn: locName });
+
+        // Find nearest station
+        let nearest: any = null;
+        let minDist = Infinity;
+        searchableLocations.forEach(loc => {
+          const d = getDistanceKm(lat, lng, loc.lat, loc.lng);
+          if (d < minDist) {
+            minDist = d;
+            nearest = loc;
+          }
+        });
+
+        if (nearest) {
+          setSelectedStartStop(nearest);
+          const destId = nearest.id === 'B_MNIT' || nearest.id === 'M2_MNIT' ? 'M_MANSAROVAR' : 'B_MNIT';
+          const destStop = searchableLocations.find(s => s.id === destId);
+          if (destStop) setSelectedEndStop(destStop as any);
+        } else {
+          const mStop = searchableLocations.find(s => s.id === 'M_MANSAROVAR');
+          if (mStop) setSelectedStartStop(mStop as any);
+          const bStop = searchableLocations.find(s => s.id === 'B_MNIT');
+          if (bStop) setSelectedEndStop(bStop as any);
         }
       }
     };
@@ -137,7 +188,7 @@ export default function App() {
     };
 
     const tryIPGeolocation = async () => {
-      // 2. Try IP-based location API as a seamless fallback (no permissions prompt required)
+      // 2. Try IP-based location API as a fallback
       try {
         const ipRes = await fetch('https://ipapi.co/json/');
         const ipJson = await ipRes.json();
@@ -147,8 +198,8 @@ export default function App() {
           throw new Error("Invalid IP geocode response format");
         }
       } catch (ipErr) {
-        console.error("IP Geolocation failed. Using Jaipur Central coordinates:", ipErr);
-        fetchWeatherAndLocation(26.9124, 75.8144, true);
+        console.error("IP Geolocation failed. Using Mansarovar coordinates fallback:", ipErr);
+        fetchWeatherAndLocation(26.8770, 75.7540, true);
       }
     };
 
@@ -167,6 +218,26 @@ export default function App() {
     if (!selectedStartStop || !selectedEndStop) return;
     store.triggerSearch();
     store.setCitizenScreen('trips');
+  };
+
+  const handleQuickSuggestion = (destId: string) => {
+    const dest = searchableLocations.find(s => s.id === destId);
+    if (!dest) return;
+    let start = selectedStartStop;
+    if (!start) {
+      const fallback = searchableLocations.find(s => s.id === 'M_MANSAROVAR');
+      if (fallback) {
+        start = fallback as any;
+        setSelectedStartStop(fallback as any);
+      }
+    }
+    setSelectedEndStop(dest as any);
+    store.setStartStopId(start ? start.id : 'M_MANSAROVAR');
+    store.setEndStopId(dest.id);
+    setTimeout(() => {
+      store.triggerSearch();
+      store.setCitizenScreen('trips');
+    }, 50);
   };
 
   // Geolocation (GPS) Handler
@@ -810,110 +881,218 @@ export default function App() {
 
               {/* AUTHENTICATED SCREEN VIEWER */}
               {store.authStep === 'authenticated' && (
-                <div className="flex-1 flex flex-col">
+                <div className="flex-grow flex flex-col relative">
                   
                   {/* TAB 1: HOME DASHBOARD */}
                   {store.citizenScreen === 'home' && (
                     <div className="flex-grow flex flex-col gap-4.5">
                       
                       {/* Greeting Header */}
-                      <div className="flex justify-between items-center mt-2.5">
+                      <div className="flex justify-between items-start mt-2.5">
                         <div>
-                          <span className="text-[9px] text-slate-400 uppercase font-black">Welcome back</span>
-                          <h3 className="text-lg font-black text-slate-900">{store.userProfile?.name || 'Shashwat'}</h3>
+                          <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider">MaaS Citizen Portal</span>
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">Namaste, {store.userProfile?.name || 'Shashwat'}</h3>
                         </div>
                         <div className="flex items-center gap-2">
                           {weatherData && (
                             <div className="flex flex-col items-end gap-0.5">
                               <div 
-                                className="bg-slate-100/90 px-2.5 py-1 rounded-2xl flex items-center gap-1 border border-slate-200 shadow-sm animate-fade-in cursor-help"
+                                className="bg-white border border-slate-200 px-2.5 py-1 rounded-2xl flex items-center gap-1 shadow-sm cursor-help"
                                 title={weatherData.desc}
                               >
                                 <span className="text-xs">{weatherData.icon}</span>
                                 <span className="text-[10px] font-extrabold text-slate-700">{weatherData.temp}°C</span>
                               </div>
-                              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tight text-right flex flex-col items-end">
-                                <span>{currentLocName}</span>
-                                {weatherData.desc.includes('Simulated') && (
-                                  <span className="text-[7px] text-amber-600 font-semibold lowercase tracking-tight leading-none mt-0.5">(simulated weather)</span>
-                                )}
-                              </span>
                             </div>
                           )}
-                          <span className="w-8 h-8 rounded-full bg-jaipur-pink/20 flex items-center justify-center text-jaipur-pink text-xs font-extrabold self-start mt-0.5 shadow-sm">
+                          <span className="w-8 h-8 rounded-full bg-jaipur-pink/20 flex items-center justify-center text-jaipur-pink text-xs font-extrabold shadow-sm">
                             {store.userProfile?.name ? store.userProfile.name.charAt(0).toUpperCase() : 'S'}
                           </span>
                         </div>
                       </div>
 
-                      {/* NCMC Card Banner */}
-                      <div className="bg-gradient-to-r from-jaipur-pink to-coral-private p-4 rounded-2xl text-white shadow-md relative overflow-hidden flex flex-col justify-between aspect-[1.8/1]">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[8px] text-white/70 uppercase font-bold tracking-wider">Unified NCMC Card</span>
-                            <h4 className="text-xs font-extrabold tracking-tight mt-0.5">Rajasthan Transit Wallet</h4>
+                      {/* Location Badge */}
+                      <div className="bg-slate-100/80 border border-slate-200 px-3.5 py-2 rounded-2xl flex items-center justify-between text-xs shadow-sm">
+                        <div className="flex items-center gap-1.5 text-slate-700">
+                          <span className="text-jaipur-pink animate-pulse text-sm">📍</span>
+                          <span className="font-extrabold text-[9px] uppercase text-slate-400">Current Position:</span>
+                          <span className="font-bold text-slate-800">{currentLocName}</span>
+                        </div>
+                        <button onClick={handleUseGPS} className="text-[9px] text-jaipur-pink font-extrabold uppercase hover:underline">
+                          Sync GPS
+                        </button>
+                      </div>
+
+                      {/* Co-branded JUMTA RuPay NCMC Card */}
+                      <div className="relative bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-[#1E293B] text-white p-4 rounded-2xl shadow-xl aspect-[1.75/1] flex flex-col justify-between overflow-hidden border border-slate-700/50">
+                        {/* Shimmer overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-pulse" />
+                        <div className="flex justify-between items-start z-10">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-5.5 bg-amber-400/20 rounded border border-amber-400/40 relative overflow-hidden flex flex-col justify-around p-0.5">
+                              <div className="h-px bg-amber-400/40 w-full" />
+                              <div className="h-px bg-amber-400/40 w-full" />
+                              <div className="h-px bg-amber-400/40 w-full" />
+                            </div>
+                            <div>
+                              <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest block leading-none">JUMTA</span>
+                              <span className="text-[7px] text-slate-500 font-bold block leading-none">RuPay NCMC</span>
+                            </div>
                           </div>
-                          <span className="text-[10px] font-mono tracking-widest text-white/50">8295</span>
+                          <div className="text-right">
+                            <span className="text-[8px] font-black text-jaipur-pink uppercase tracking-widest block">One City. One Ticket.</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[8px] text-white/60 uppercase block">Available Balance</span>
+                        <div className="z-10">
+                          <span className="text-[8px] text-slate-400 uppercase tracking-wider block">Available Balance</span>
                           <span className="text-2xl font-black tracking-tight">₹{store.walletBalance}</span>
+                          <span className="text-[9px] font-mono tracking-widest text-slate-500 block mt-0.5">**** **** **** 8295</span>
                         </div>
-                        <div className="flex justify-between items-end border-t border-white/10 pt-2 text-[9px] text-white/70">
-                          <span>Federal Bank Co-Brand</span>
-                          <span className="font-bold">RuPay</span>
+                        <div className="flex justify-between items-end border-t border-slate-800/80 pt-2 text-[8px] text-slate-400 z-10">
+                          <span className="font-semibold">Rajasthan Mobility Authority</span>
+                          <span className="font-black italic text-white text-[9px]">RuPay <span className="text-jaipur-pink">⚡</span></span>
                         </div>
                       </div>
 
-                      {/* Search-First bottom trigger */}
+                      {/* Search trigger */}
                       <div 
                         onClick={() => {
                           store.setCitizenScreen('trips');
                           setSearchMode('to');
                         }}
-                        className="bg-white border border-slate-200 p-3 rounded-2xl flex items-center gap-3 cursor-pointer shadow-sm hover:border-slate-300 transition-all"
+                        className="bg-white border border-slate-200 p-3.5 rounded-2xl flex items-center gap-3 cursor-pointer shadow-sm hover:border-slate-300 transition-all"
                       >
                         <Search className="w-4 h-4 text-slate-400" />
-                        <span className="text-xs text-slate-400 font-medium">Where do you want to go?</span>
+                        <span className="text-xs text-slate-400 font-bold">Where do you want to travel today?</span>
                       </div>
 
-                      {/* Quick shortcuts grid */}
-                      <div className="grid grid-cols-4 gap-2.5">
-                        <button onClick={() => { store.setCitizenScreen('trips'); }} className="bg-white border border-slate-100 p-2.5 rounded-xl text-center shadow-sm flex flex-col items-center gap-1">
-                          <span className="w-8 h-8 rounded-full bg-metro-blue/15 flex items-center justify-center text-metro-blue text-xs font-bold">🚇</span>
-                          <span className="text-[9px] font-bold text-slate-700">Metro</span>
-                        </button>
-                        <button onClick={() => { store.setCitizenScreen('trips'); }} className="bg-white border border-slate-100 p-2.5 rounded-xl text-center shadow-sm flex flex-col items-center gap-1">
-                          <span className="w-8 h-8 rounded-full bg-transit-green/15 flex items-center justify-center text-transit-green text-xs font-bold">🚌</span>
-                          <span className="text-[9px] font-bold text-slate-700">Bus</span>
-                        </button>
-                        <button onClick={() => { store.setCitizenScreen('wallet'); }} className="bg-white border border-slate-100 p-2.5 rounded-xl text-center shadow-sm flex flex-col items-center gap-1">
-                          <span className="w-8 h-8 rounded-full bg-mobility-amber/15 flex items-center justify-center text-mobility-amber text-xs font-bold">🛺</span>
-                          <span className="text-[9px] font-bold text-slate-700">Auto</span>
-                        </button>
-                        <button onClick={() => { store.setCitizenScreen('ai_assistant'); }} className="bg-white border border-slate-100 p-2.5 rounded-xl text-center shadow-sm flex flex-col items-center gap-1">
-                          <span className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xs font-bold">🤖</span>
-                          <span className="text-[9px] font-bold text-slate-700">AI Assistant</span>
-                        </button>
+                      {/* Mode Toggles */}
+                      <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">🎓</span>
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-800 block">Student Concession (College Mode)</span>
+                              <span className="text-[9px] text-slate-400">Get 50% concession on Metro routes</span>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={store.collegeMode} 
+                              onChange={(e) => store.setCollegeMode(e.target.checked)} 
+                              className="sr-only peer" 
+                            />
+                            <div className="w-7 h-4 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-jaipur-pink" />
+                          </label>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">🏛️</span>
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-800 block">Jaipur Sightseeing (Tourist Mode)</span>
+                              <span className="text-[9px] text-slate-400">Prioritize heritage corridors & local stops</span>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={store.touristMode} 
+                              onChange={(e) => store.setTouristMode(e.target.checked)} 
+                              className="sr-only peer" 
+                            />
+                            <div className="w-7 h-4 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-jaipur-pink" />
+                          </label>
+                        </div>
                       </div>
 
-                      {/* Live Nearby departures (JCTSL / JMRC) */}
+                      {/* Quick Suggestions Grid */}
                       <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-3">
-                        <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider">Live Nearby Arrivals</span>
-                        <div className="flex flex-col gap-2.5">
+                        <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Quick suggestions</span>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button 
+                            onClick={() => handleQuickSuggestion('POI_RAILWAY')}
+                            className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl hover:bg-slate-100 flex flex-col justify-between items-start aspect-square shadow-sm transition-all"
+                          >
+                            <span className="text-lg">💼</span>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-800 block text-left">To Work</span>
+                              <span className="text-[8px] text-slate-400 text-left block leading-tight">Jaipur Junction</span>
+                            </div>
+                          </button>
+                          <button 
+                            onClick={() => handleQuickSuggestion('POI_MNIT')}
+                            className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl hover:bg-slate-100 flex flex-col justify-between items-start aspect-square shadow-sm transition-all"
+                          >
+                            <span className="text-lg">🎓</span>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-800 block text-left">To MNIT</span>
+                              <span className="text-[8px] text-slate-400 text-left block leading-tight">Campus Hub</span>
+                            </div>
+                          </button>
+                          <button 
+                            onClick={() => handleQuickSuggestion('POI_AIRPORT')}
+                            className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl hover:bg-slate-100 flex flex-col justify-between items-start aspect-square shadow-sm transition-all"
+                          >
+                            <span className="text-lg">✈️</span>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-800 block text-left">To Airport</span>
+                              <span className="text-[8px] text-slate-400 text-left block leading-tight">Terminal 1</span>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Live Nearby arrivals (JCTSL / JMRC) */}
+                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider">Live Nearby Feed</span>
+                          <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase animate-pulse">Live</span>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          {/* Metro Departure */}
                           <div className="flex justify-between items-center text-xs">
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 bg-metro-blue/15 text-metro-blue rounded text-[8px] font-extrabold">METRO</span>
-                              <span className="font-bold text-slate-800">Mansarovar Metro</span>
+                              <span className="px-1.5 py-0.5 bg-jaipur-pink/15 text-jaipur-pink rounded text-[8px] font-black uppercase">JMRC Metro</span>
+                              <div>
+                                <span className="font-bold text-slate-800 block">Mansarovar Station</span>
+                                <span className="text-[9px] text-slate-400">Pink Line Terminus · 150m away</span>
+                              </div>
                             </div>
-                            <span className="font-bold text-slate-500 font-mono">In 3 min</span>
+                            <div className="text-right">
+                              <span className="font-extrabold text-slate-850 block font-mono">In 2 mins</span>
+                              <span className="text-[8px] text-slate-400">Next: 8 mins</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between items-center text-xs border-t border-slate-100 pt-2.5">
+                          
+                          {/* Bus Departure */}
+                          <div className="flex justify-between items-center text-xs border-t border-slate-100 pt-3">
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 bg-transit-green/15 text-transit-green rounded text-[8px] font-extrabold">BUS 3</span>
-                              <span className="font-bold text-slate-800">MNIT Bus Stop</span>
+                              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[8px] font-black uppercase">JCTSL Bus</span>
+                              <div>
+                                <span className="font-bold text-slate-800 block">Route 3 Bus Stand</span>
+                                <span className="text-[9px] text-slate-400">To Transport Nagar · 300m away</span>
+                              </div>
                             </div>
-                            <span className="font-bold text-slate-500 font-mono">In 8 min</span>
+                            <div className="text-right">
+                              <span className="font-extrabold text-slate-850 block font-mono">In 5 mins</span>
+                              <span className="text-[8px] text-slate-400">Next: 12 mins</span>
+                            </div>
+                          </div>
+
+                          {/* Auto/Feeder stand */}
+                          <div className="flex justify-between items-center text-xs border-t border-slate-100 pt-3">
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[8px] font-black uppercase">E-Rickshaw</span>
+                              <div>
+                                <span className="font-bold text-slate-800 block">Feeder Stand Gate 2</span>
+                                <span className="text-[9px] text-slate-400">14 rickshaws in queue · 20m away</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-extrabold text-emerald-600 block font-mono">Available</span>
+                              <span className="text-[8px] text-slate-400">₹10 flat fare</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -921,255 +1100,347 @@ export default function App() {
                   )}
 
                   {/* TAB 2: JOURNEY PLANNER & ROUTE DETAILS */}
-                  {store.citizenScreen === 'trips' && (
-                    <div className="flex-grow flex flex-col gap-3">
-                      <div className="mt-2.5">
-                        <span className="text-[9px] text-slate-400 uppercase font-black">Search Optimal Routes</span>
-                        <h2 className="text-lg font-black text-slate-900">Multimodal Planner</h2>
-                      </div>
+                  {store.citizenScreen === 'trips' && (() => {
+                    const routesByCategory = {
+                      public: store.calculatedRoutes.filter(r => r.type === 'CHEAPEST'),
+                      hybrid: store.calculatedRoutes.filter(r => r.type === 'RECOMMENDED' || r.type === 'LEAST_WALKING'),
+                      private: store.calculatedRoutes.filter(r => r.type === 'FASTEST'),
+                      green: store.calculatedRoutes.filter(r => r.type === 'GREENEST')
+                    };
 
-                      {/* Route Selection Panel */}
-                      <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex flex-col gap-3">
-                        
-                        {/* Start stop picker bottom sheet trigger */}
-                        <div 
-                          onClick={() => setSearchMode('from')}
-                          className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-transit-green" />
-                            <span className="text-xs font-bold text-slate-700">
-                              {selectedStartStop ? selectedStartStop.nameEn : 'Select starting station'}
+                    const renderRouteCard = (route: any) => (
+                      <div 
+                        key={route.id}
+                        onClick={() => {
+                          store.setSelectedRouteId(route.id);
+                          store.setCitizenScreen('checkout');
+                        }}
+                        className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm cursor-pointer hover:border-slate-350 transition-all flex flex-col gap-2 relative overflow-hidden"
+                      >
+                        {/* Option Badge */}
+                        <div className="absolute top-2.5 right-2.5">
+                          {route.type === 'RECOMMENDED' && (
+                            <span className="bg-jaipur-pink/15 text-jaipur-pink border border-jaipur-pink/20 px-1.5 py-0.5 rounded text-[8px] font-black">
+                              ⭐ RECOMMENDED
                             </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">Change</span>
+                          )}
+                          {route.type === 'GREENEST' && (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[8px] font-black">
+                              🌱 GREENEST
+                            </span>
+                          )}
+                          {route.type === 'FASTEST' && (
+                            <span className="bg-amber-100 text-amber-705 border border-amber-200 px-1.5 py-0.5 rounded text-[8px] font-black">
+                              ⚡ RAPID
+                            </span>
+                          )}
+                          {route.type === 'CHEAPEST' && (
+                            <span className="bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-black">
+                              🪙 CHEAPEST
+                            </span>
+                          )}
+                          {route.type === 'LEAST_WALKING' && (
+                            <span className="bg-indigo-50 text-indigo-705 border border-indigo-200 px-1.5 py-0.5 rounded text-[8px] font-black">
+                              🚶 LEAST WALKING
+                            </span>
+                          )}
                         </div>
 
-                        {/* End stop picker bottom sheet trigger */}
-                        <div 
-                          onClick={() => setSearchMode('to')}
-                          className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-jaipur-pink" />
-                            <span className="text-xs font-bold text-slate-700">
-                              {selectedEndStop ? selectedEndStop.nameEn : 'Select destination'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">Change</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-black text-slate-900">{route.totalTime} min</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase">MaaS Score</span>
+                          <span className="text-xs font-mono font-bold text-jaipur-pink">{route.score}/100</span>
                         </div>
 
-                        {/* Search Button */}
-                        <button 
-                          onClick={handleSearchTrigger}
-                          className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider shadow hover:bg-slate-800 transition-all cursor-pointer"
-                        >
-                          Find Valid Connectivity
-                        </button>
-                      </div>
-
-                      {/* ROUTE COMPARISON FRONTIER CARDS */}
-                      {store.lastSearchExecuted && (
-                        <div className="flex flex-col gap-2 mt-2">
-                          <span className="text-[8px] text-slate-400 uppercase font-black tracking-wider block">Validated Routes (OSM Graph)</span>
-                          {store.calculatedRoutes.map((route) => (
-                            <div 
-                              key={route.id}
-                              onClick={() => {
-                                store.setSelectedRouteId(route.id);
-                                store.setCitizenScreen('checkout');
-                              }}
-                              className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm cursor-pointer hover:border-slate-300 transition-all flex flex-col gap-2 relative overflow-hidden"
-                            >
-                              {/* Option Badge */}
-                              <div className="absolute top-2.5 right-2.5">
-                                {route.type === 'RECOMMENDED' && (
-                                  <span className="bg-jaipur-pink/15 text-jaipur-pink border border-jaipur-pink/20 px-1.5 py-0.5 rounded text-[8px] font-black">
-                                    ⭐ RECOMMENDED
-                                  </span>
-                                )}
-                                {route.type === 'PT_ONLY' && (
-                                  <span className="bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-black">
-                                    🌱 GREENEST
-                                  </span>
-                                )}
-                                {route.type === 'FAST_PRIVATE' && (
-                                  <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[8px] font-black">
-                                    ⚡ RAPID
-                                  </span>
-                                )}
+                        {/* Route segment nodes visual tracker */}
+                        <div className="flex flex-wrap gap-1 items-center mt-0.5">
+                          {route.segments.map((seg: any, idx: number) => (
+                            <React.Fragment key={idx}>
+                              {idx > 0 && <span className="text-slate-300 text-[9px]">➔</span>}
+                              <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                <span className="text-[10px]">
+                                  {seg.mode === 'METRO' && '🚇'}
+                                  {seg.mode === 'BUS' && '🚌'}
+                                  {seg.mode === 'AUTO' && '🛺'}
+                                  {seg.mode === 'CYCLE' && '🚲'}
+                                  {seg.mode === 'WALK' && '🚶'}
+                                </span>
+                                <span className="text-[8px] text-slate-500 font-bold uppercase">{seg.mode}</span>
                               </div>
-
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-base font-black text-slate-900">{route.totalTime} min</span>
-                                <span className="text-[9px] text-slate-400">MaaS Score</span>
-                                <span className="text-xs font-mono font-bold text-jaipur-pink">{route.score}/100</span>
-                              </div>
-
-                              {/* Fare / Carbon info */}
-                              <div className="flex justify-between items-center text-xs border-t border-slate-50 pt-2 text-slate-600">
-                                <span className="font-bold text-slate-800">₹{route.totalFare}</span>
-                                <span className="text-[9px] text-slate-400 font-medium">({route.totalWalkingKm} km walk · {route.totalTransfers} transfer)</span>
-                              </div>
-                            </div>
+                            </React.Fragment>
                           ))}
                         </div>
-                      )}
 
-                      {/* BOTTOM SHEET SELECTOR OVERLAY */}
-                      {searchMode && (
-                        <div className="absolute inset-0 bg-slate-900/60 z-50 flex flex-col justify-end">
-                          <div className="bg-white rounded-t-3xl max-h-[85%] overflow-y-auto p-4 flex flex-col gap-3.5 shadow-2xl font-sora">
-                            <div className="flex justify-between items-center">
-                              <h4 className="text-xs font-black text-slate-900 uppercase">
-                                {searchMode === 'from' ? 'Select Start Location' : 'Select Destination'}
-                              </h4>
-                              <button 
-                                onClick={() => { setSearchMode(null); setSearchQuery(''); setIsSelectingOnMap(false); }}
-                                className="text-xs text-slate-400 font-bold hover:text-slate-600 cursor-pointer"
-                              >
-                                Close
-                              </button>
+                        {/* Fare / Carbon info */}
+                        <div className="flex justify-between items-center text-xs border-t border-slate-50 pt-2 text-slate-600">
+                          <span className="font-bold text-slate-800">₹{route.totalFare}</span>
+                          <span className="text-[9px] text-slate-400 font-medium">
+                            ({route.totalWalkingKm} km walk · {route.totalTransfers} transfer{route.totalTransfers !== 1 && 's'} · {route.totalCarbon} kg CO₂)
+                          </span>
+                        </div>
+                      </div>
+                    );
+
+                    return (
+                      <div className="flex-grow flex flex-col gap-3">
+                        <div className="mt-2.5">
+                          <span className="text-[9px] text-slate-400 uppercase font-black">Search Optimal Routes</span>
+                          <h2 className="text-lg font-black text-slate-900">Multimodal Planner</h2>
+                        </div>
+
+                        {/* Route Selection Panel */}
+                        <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex flex-col gap-3">
+                          
+                          {/* Start stop picker bottom sheet trigger */}
+                          <div 
+                            onClick={() => setSearchMode('from')}
+                            className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-transit-green" />
+                              <span className="text-xs font-bold text-slate-700">
+                                {selectedStartStop ? selectedStartStop.nameEn : 'Select starting station'}
+                              </span>
                             </div>
+                            <span className="text-[10px] text-slate-400 font-bold">Change</span>
+                          </div>
 
-                            {/* Geolocation & Map Actions */}
-                            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
-                              <button 
-                                onClick={handleUseGPS}
-                                className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all border border-slate-200"
-                              >
-                                📍 Use GPS Location
-                              </button>
-                              <button 
-                                onClick={() => setIsSelectingOnMap(!isSelectingOnMap)}
-                                className={`py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all border ${
-                                  isSelectingOnMap 
-                                    ? 'bg-jaipur-pink text-white border-jaipur-pink' 
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                🗺️ {isSelectingOnMap ? 'Search Locations' : 'Select on Map'}
-                              </button>
+                          {/* End stop picker bottom sheet trigger */}
+                          <div 
+                            onClick={() => setSearchMode('to')}
+                            className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-jaipur-pink" />
+                              <span className="text-xs font-bold text-slate-700">
+                                {selectedEndStop ? selectedEndStop.nameEn : 'Select destination'}
+                              </span>
                             </div>
+                            <span className="text-[10px] text-slate-400 font-bold">Change</span>
+                          </div>
 
-                            {isSelectingOnMap ? (
-                              <div className="flex flex-col gap-3">
-                                <div 
-                                  id="google-map-selector" 
-                                  className="w-full h-44 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden relative shadow-sm"
-                                />
-                                <button
-                                  onClick={handleConfirmMapLocation}
-                                  className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-md"
+                          {/* Search Button */}
+                          <button 
+                            onClick={handleSearchTrigger}
+                            className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider shadow hover:bg-slate-800 transition-all cursor-pointer"
+                          >
+                            Find Valid Connectivity
+                          </button>
+                        </div>
+
+                        {/* Route Results grouped by Category */}
+                        {store.lastSearchExecuted && (
+                          <div className="flex flex-col gap-4 mt-2">
+                            {/* Category: Public Transport */}
+                            {routesByCategory.public.length > 0 && (
+                              <div className="flex flex-col gap-2">
+                                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">🚌 Public Transport</span>
+                                {routesByCategory.public.map(renderRouteCard)}
+                              </div>
+                            )}
+
+                            {/* Category: Hybrid Transport */}
+                            {routesByCategory.hybrid.length > 0 && (
+                              <div className="flex flex-col gap-2">
+                                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">🔄 Hybrid Mobility (Feeder + Transit)</span>
+                                {routesByCategory.hybrid.map(renderRouteCard)}
+                              </div>
+                            )}
+
+                            {/* Category: Private Transport */}
+                            {routesByCategory.private.length > 0 && (
+                              <div className="flex flex-col gap-2">
+                                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">🚗 Private Ride-Hailing</span>
+                                {routesByCategory.private.map(renderRouteCard)}
+                              </div>
+                            )}
+
+                            {/* Category: Green Mobility */}
+                            {routesByCategory.green.length > 0 && (
+                              <div className="flex flex-col gap-2">
+                                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">🌱 Green & Zero-Emission</span>
+                                {routesByCategory.green.map(renderRouteCard)}
+                              </div>
+                            )}
+
+                            {/* Live Map Experience */}
+                            <div className="mt-3">
+                              <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Live Traffic & Vehicles Map</span>
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                                  <span>Phase 2</span>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={store.twinLayers.phase2}
+                                    onChange={() => store.toggleTwinLayer('phase2')}
+                                    className="w-3.5 h-3.5 text-jaipur-pink border-slate-300 rounded cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+                              <InteractiveMaaSMap 
+                                selectedRoute={store.calculatedRoutes.find(r => r.id === store.selectedRouteId)} 
+                                showPhase2={store.twinLayers.phase2}
+                                userLocation={store.userLocation}
+                                height={220}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* BOTTOM SHEET SELECTOR OVERLAY */}
+                        {searchMode && (
+                          <div className="absolute inset-0 bg-slate-900/60 z-50 flex flex-col justify-end">
+                            <div className="bg-white rounded-t-3xl max-h-[85%] overflow-y-auto p-4 flex flex-col gap-3.5 shadow-2xl font-sora">
+                              <div className="flex justify-between items-center">
+                                <h4 className="text-xs font-black text-slate-900 uppercase">
+                                  {searchMode === 'from' ? 'Select Start Location' : 'Select Destination'}
+                                </h4>
+                                <button 
+                                  onClick={() => { setSearchMode(null); setSearchQuery(''); setIsSelectingOnMap(false); }}
+                                  className="text-xs text-slate-400 font-bold hover:text-slate-655 cursor-pointer"
                                 >
-                                  Confirm Selected Pin Location
+                                  Close
                                 </button>
                               </div>
-                            ) : (
-                              <>
-                                {/* Search input */}
-                                <input 
-                                  type="text"
-                                  autoFocus
-                                  placeholder="Search stop, station, or landmark..."
-                                  value={searchQuery}
-                                  onChange={(e) => setSearchQuery(e.target.value)}
-                                  className="w-full border border-slate-200 bg-slate-50 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-jaipur-pink shadow-inner"
-                                />
 
-                                {/* Categorized Suggestion list */}
-                                <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-1">
-                                  {/* Landmarks */}
-                                  {groupPOIs.length > 0 && (
-                                    <div className="flex flex-col gap-1.5">
-                                      <span className="text-[9px] text-jaipur-pink font-extrabold uppercase tracking-wider block">Popular Landmarks (POIs)</span>
-                                      {groupPOIs.map(loc => (
-                                        <div 
-                                          key={loc.id}
-                                          onClick={() => {
-                                            if (searchMode === 'from') setSelectedStartStop(loc as any);
-                                            else setSelectedEndStop(loc as any);
-                                            setSearchMode(null);
-                                            setSearchQuery('');
-                                          }}
-                                          className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
-                                        >
-                                          <div>
-                                            <span className="font-bold block text-slate-800">{loc.nameEn}</span>
-                                            <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
-                                          </div>
-                                          <span className="px-2 py-0.5 rounded text-[8px] font-black bg-jaipur-pink/15 text-jaipur-pink uppercase">
-                                            ⚡ Landmark
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                              {/* Geolocation & Map Actions */}
+                              <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                                <button 
+                                  onClick={handleUseGPS}
+                                  className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all border border-slate-200"
+                                >
+                                  📍 Use GPS Location
+                                </button>
+                                <button 
+                                  onClick={() => setIsSelectingOnMap(!isSelectingOnMap)}
+                                  className={`py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all border ${
+                                    isSelectingOnMap 
+                                      ? 'bg-jaipur-pink text-white border-jaipur-pink' 
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  🗺️ {isSelectingOnMap ? 'Search Locations' : 'Select on Map'}
+                                </button>
+                              </div>
 
-                                  {/* Metro */}
-                                  {groupMetro.length > 0 && (
-                                    <div className="flex flex-col gap-1.5">
-                                      <span className="text-[9px] text-metro-blue font-extrabold uppercase tracking-wider block">Metro Stations (JMRC)</span>
-                                      {groupMetro.map(loc => (
-                                        <div 
-                                          key={loc.id}
-                                          onClick={() => {
-                                            if (searchMode === 'from') setSelectedStartStop(loc);
-                                            else setSelectedEndStop(loc);
-                                            setSearchMode(null);
-                                            setSearchQuery('');
-                                          }}
-                                          className="p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
-                                        >
-                                          <div>
-                                            <span className="font-bold block text-slate-800">{loc.nameEn}</span>
-                                            <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
-                                          </div>
-                                          <span className="px-2 py-0.5 rounded text-[8px] font-black bg-metro-blue/15 text-metro-blue uppercase">
-                                            🚇 Metro
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Bus Stops */}
-                                  {groupBus.length > 0 && (
-                                    <div className="flex flex-col gap-1.5">
-                                      <span className="text-[9px] text-transit-green font-extrabold uppercase tracking-wider block">JCTSL Bus Stops</span>
-                                      {groupBus.map(loc => (
-                                        <div 
-                                          key={loc.id}
-                                          onClick={() => {
-                                            if (searchMode === 'from') setSelectedStartStop(loc);
-                                            else setSelectedEndStop(loc);
-                                            setSearchMode(null);
-                                            setSearchQuery('');
-                                          }}
-                                          className="p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
-                                        >
-                                          <div>
-                                            <span className="font-bold block text-slate-800">{loc.nameEn}</span>
-                                            <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
-                                          </div>
-                                          <span className="px-2 py-0.5 rounded text-[8px] font-black bg-transit-green/15 text-transit-green uppercase">
-                                            🚌 Bus Stop
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                              {isSelectingOnMap ? (
+                                <div className="flex flex-col gap-3">
+                                  <div 
+                                    id="google-map-selector" 
+                                    className="w-full h-44 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden relative shadow-sm"
+                                  />
+                                  <button
+                                    onClick={handleConfirmMapLocation}
+                                    className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-md"
+                                  >
+                                    Confirm Selected Pin Location
+                                  </button>
                                 </div>
-                              </>
-                            )}
+                              ) : (
+                                <>
+                                  {/* Search input */}
+                                  <input 
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Search stop, station, or landmark..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full border border-slate-200 bg-slate-50 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-jaipur-pink shadow-inner"
+                                  />
+
+                                  {/* Categorized Suggestion list */}
+                                  <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-1">
+                                    {/* Landmarks */}
+                                    {groupPOIs.length > 0 && (
+                                      <div className="flex flex-col gap-1.5">
+                                        <span className="text-[9px] text-jaipur-pink font-extrabold uppercase tracking-wider block">Popular Landmarks (POIs)</span>
+                                        {groupPOIs.map(loc => (
+                                          <div 
+                                            key={loc.id}
+                                            onClick={() => {
+                                              if (searchMode === 'from') setSelectedStartStop(loc as any);
+                                              else setSelectedEndStop(loc as any);
+                                              setSearchMode(null);
+                                              setSearchQuery('');
+                                            }}
+                                            className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
+                                          >
+                                            <div>
+                                              <span className="font-bold block text-slate-800">{loc.nameEn}</span>
+                                              <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded text-[8px] font-black bg-jaipur-pink/15 text-jaipur-pink uppercase">
+                                              ⚡ Landmark
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Metro */}
+                                    {groupMetro.length > 0 && (
+                                      <div className="flex flex-col gap-1.5">
+                                        <span className="text-[9px] text-metro-blue font-extrabold uppercase tracking-wider block">Metro Stations (JMRC)</span>
+                                        {groupMetro.map(loc => (
+                                          <div 
+                                            key={loc.id}
+                                            onClick={() => {
+                                              if (searchMode === 'from') setSelectedStartStop(loc);
+                                              else setSelectedEndStop(loc);
+                                              setSearchMode(null);
+                                              setSearchQuery('');
+                                            }}
+                                            className="p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
+                                          >
+                                            <div>
+                                              <span className="font-bold block text-slate-800">{loc.nameEn}</span>
+                                              <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded text-[8px] font-black bg-metro-blue/15 text-metro-blue uppercase">
+                                              🚇 Metro
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Bus Stops */}
+                                    {groupBus.length > 0 && (
+                                      <div className="flex flex-col gap-1.5">
+                                        <span className="text-[9px] text-transit-green font-extrabold uppercase tracking-wider block">JCTSL Bus Stops</span>
+                                        {groupBus.map(loc => (
+                                          <div 
+                                            key={loc.id}
+                                            onClick={() => {
+                                              if (searchMode === 'from') setSelectedStartStop(loc);
+                                              else setSelectedEndStop(loc);
+                                              setSearchMode(null);
+                                              setSearchQuery('');
+                                            }}
+                                            className="p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-700"
+                                          >
+                                            <div>
+                                              <span className="font-bold block text-slate-800">{loc.nameEn}</span>
+                                              <span className="font-devanagari text-[9px] text-slate-400">{loc.nameHi}</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded text-[8px] font-black bg-transit-green/15 text-transit-green uppercase">
+                                              🚌 Bus Stop
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    );
+                  })()}
 
-                    </div>
-                  )}
-
-                  {/* TAB 3: TICKETS */}
+                  {/* TAB 3: CHECKOUT SCREEN */}
                   {store.citizenScreen === 'checkout' && (() => {
                     const selectedRoute = store.calculatedRoutes.find(r => r.id === store.selectedRouteId);
                     if (!selectedRoute) return null;
@@ -1179,7 +1450,7 @@ export default function App() {
                         <div className="flex items-center gap-2 mt-2">
                           <button 
                             onClick={() => store.setCitizenScreen('trips')}
-                            className="text-slate-400 text-xs hover:text-slate-800 cursor-pointer"
+                            className="text-slate-400 text-xs hover:text-slate-800 cursor-pointer font-bold"
                           >
                             ← Back
                           </button>
@@ -1191,29 +1462,35 @@ export default function App() {
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-600 flex flex-col gap-2">
                               <div className="flex justify-between items-baseline border-b border-slate-200/60 pb-2">
                                 <span className="text-[10px] font-black uppercase text-slate-400">Total Fare</span>
-                                <span className="text-xl font-black text-slate-900">₹{selectedRoute.totalFare}</span>
+                                <span className="text-xl font-black text-slate-900 font-mono">₹{selectedRoute.totalFare}</span>
                               </div>
-                              <div className="flex justify-between text-[11px]">
-                                <span>Transit Path</span>
-                                <span className="font-bold text-slate-800">Multi-Modal Intermodal</span>
+                              <div className="flex justify-between text-[11px] font-bold">
+                                <span>Transit Route type</span>
+                                <span className="text-slate-800">Jaipur Unified Intermodal</span>
                               </div>
                               {selectedRoute.savingPercent > 0 && (
-                                <div className="flex justify-between text-[11px] text-transit-green">
-                                  <span>Dynamic Saving</span>
-                                  <span className="font-extrabold">Save {selectedRoute.savingPercent}%</span>
+                                <div className="flex justify-between text-[11px] text-transit-green font-bold">
+                                  <span>Integrated Discount</span>
+                                  <span className="font-black">Save {selectedRoute.savingPercent}%</span>
+                                </div>
+                              )}
+                              {store.collegeMode && (
+                                <div className="flex justify-between text-[11px] text-jaipur-pink font-bold">
+                                  <span>Concession Category</span>
+                                  <span className="font-black">Student (50% Metro)</span>
                                 </div>
                               )}
                             </div>
 
                             {/* Wallet Option */}
-                            <div className="border border-slate-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                            <div className="border border-slate-250 p-3.5 rounded-2xl flex justify-between items-center shadow-sm">
                               <div>
-                                <span className="text-[9px] text-slate-400 uppercase font-bold">NCMC WALLET</span>
-                                <h4 className="text-xs font-bold text-slate-800">Available: ₹{store.walletBalance}</h4>
+                                <span className="text-[9px] text-slate-400 uppercase font-black">NCMC WALLET</span>
+                                <h4 className="text-xs font-black text-slate-800">Available: ₹{store.walletBalance}</h4>
                               </div>
                               <button 
                                 onClick={() => handleWalletPay(selectedRoute.totalFare)}
-                                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 cursor-pointer"
+                                className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer shadow-sm"
                               >
                                 Pay &amp; Ticket
                               </button>
@@ -1222,9 +1499,9 @@ export default function App() {
                             {/* Simulated UPI */}
                             <button 
                               onClick={handleUPIPay}
-                              className="w-full bg-slate-100 border border-slate-200 text-slate-800 py-3 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer"
+                              className="w-full bg-slate-100 border border-slate-200 text-slate-800 py-3 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer shadow-inner"
                             >
-                              Pay with GPay / PhonePe
+                              Pay with Google Pay / PhonePe
                             </button>
                           </div>
                         )}
@@ -1232,14 +1509,14 @@ export default function App() {
                         {paymentState === 'processing' && (
                           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-10">
                             <RefreshCw className="w-8 h-8 text-jaipur-pink animate-spin" />
-                            <h4 className="text-xs font-bold text-slate-600">Verifying secure wallet transaction...</h4>
+                            <h4 className="text-xs font-bold text-slate-650">Verifying secure wallet transaction...</h4>
                           </div>
                         )}
 
                         {paymentState === 'success' && (
                           <div className="flex-grow flex flex-col items-center justify-center gap-4 py-8">
                             <CheckCircle className="w-12 h-12 text-transit-green animate-bounce" />
-                            <h4 className="text-sm font-black text-slate-800">Payment Successful!</h4>
+                            <h4 className="text-sm font-black text-slate-805">Payment Successful!</h4>
                           </div>
                         )}
                       </div>
@@ -1247,74 +1524,145 @@ export default function App() {
                   })()}
 
                   {/* TAB 3: TICKETS DASHBOARD */}
-                  {store.citizenScreen === 'tracking' && (
-                    <div className="flex-grow flex flex-col gap-3">
-                      <div className="mt-2.5">
-                        <span className="text-[9px] text-slate-400 uppercase font-black animate-pulse">Ticket CONFIRMED</span>
-                        <h2 className="text-lg font-black text-slate-900">Your Unified Ticket</h2>
-                      </div>
+                  {store.citizenScreen === 'tracking' && (() => {
+                    const selectedRoute = store.calculatedRoutes.find(r => r.id === store.selectedRouteId) || store.calculatedRoutes[0];
 
-                      {/* TICKET MOCK CARD */}
-                      <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm flex flex-col items-center gap-3 relative overflow-hidden">
-                        {/* Shimmer hologram effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-pulse pointer-events-none" />
-                        
-                        <div className="bg-white p-2.5 border border-slate-100 rounded-2xl shadow-sm">
-                          {/* Simulated QR Code */}
-                          <div className="w-28 h-28 border-4 border-slate-900 p-1 flex flex-wrap">
-                            {Array.from({ length: 64 }).map((_, idx) => (
-                              <div 
-                                key={idx} 
-                                className={`w-[11px] h-[11px] ${
-                                  (idx + Math.floor(Date.now() / 15000)) % 3 === 0 ? 'bg-slate-900' : 'bg-transparent'
-                                }`}
-                              />
-                            ))}
+                    return (
+                      <div className="flex-grow flex flex-col gap-3 relative">
+                        <div className="mt-2.5 flex justify-between items-center">
+                          <div>
+                            <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider animate-pulse">Active Intermodal Pass</span>
+                            <h2 className="text-lg font-black text-slate-900">Your Unified Ticket</h2>
                           </div>
+                          
+                          {/* Floating SOS Trigger Button */}
+                          <button
+                            onClick={() => setShowSOSOverlay(true)}
+                            className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg border border-red-500 animate-pulse flex items-center justify-center cursor-pointer"
+                            title="Emergency SOS"
+                          >
+                            🚨 <span className="text-[9px] font-black uppercase tracking-wider ml-1 pr-1">SOS</span>
+                          </button>
                         </div>
 
-                        <span className="text-[10px] bg-slate-100 px-3 py-0.5 rounded text-slate-500 font-mono tracking-widest uppercase font-bold">
-                          JUMP-JCT-8295
-                        </span>
+                        {/* TICKET MOCK CARD */}
+                        <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm flex flex-col items-center gap-3.5 relative overflow-hidden">
+                          {/* Hologram card effect */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-pulse pointer-events-none" />
+                          
+                          <div className="bg-white p-3 border border-slate-150 rounded-2xl shadow-sm relative">
+                            {/* Simulated QR Code with Scanner Shimmer */}
+                            <div className="relative w-28 h-28 border-4 border-slate-900 p-1 flex flex-wrap">
+                              {Array.from({ length: 64 }).map((_, idx) => (
+                                <div 
+                                  key={idx} 
+                                  className={`w-[11px] h-[11px] ${
+                                    (idx + Math.floor(validitySeconds / 5)) % 3 === 0 ? 'bg-slate-900' : 'bg-transparent'
+                                  }`}
+                                />
+                              ))}
+                              {/* Scanner Line animation */}
+                              <div className="absolute left-0 right-0 h-0.5 bg-jaipur-pink shadow-md shadow-jaipur-pink top-0 animate-bounce" />
+                            </div>
+                          </div>
 
-                        <div className="w-full border-t border-dashed border-slate-200 pt-3 text-xs text-slate-600 flex flex-col gap-1.5">
-                          <div className="flex justify-between font-bold text-slate-800">
-                            <span>{selectedStartStop?.nameEn || 'Mansarovar Metro'}</span>
-                            <span>→</span>
-                            <span>{selectedEndStop?.nameEn || 'Aravali Hostel, MNIT'}</span>
-                          </div>
-                          <div className="flex justify-between text-[10px] text-slate-400">
-                            <span>Validity</span>
-                            <span>Expires in 1h 45m</span>
-                          </div>
+                          <span className="text-[10px] bg-slate-100 border border-slate-200 px-3 py-0.5 rounded text-slate-600 font-mono tracking-widest uppercase font-extrabold">
+                            JUMP-JCT-8295
+                          </span>
+
+                          {selectedRoute && (
+                            <div className="w-full border-t border-dashed border-slate-200 pt-3 text-xs text-slate-650 flex flex-col gap-2">
+                              {/* Intermodal badges */}
+                              <div className="flex items-center justify-center gap-1.5 bg-slate-50 py-2 rounded-xl border border-slate-150">
+                                {selectedRoute.segments.map((seg: any, idx: number) => (
+                                  <React.Fragment key={idx}>
+                                    {idx > 0 && <span className="text-slate-300 text-[10px]">➔</span>}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px]">
+                                        {seg.mode === 'METRO' && '🚇'}
+                                        {seg.mode === 'BUS' && '🚌'}
+                                        {seg.mode === 'AUTO' && '🛺'}
+                                        {seg.mode === 'CYCLE' && '🚲'}
+                                        {seg.mode === 'WALK' && '🚶'}
+                                      </span>
+                                      <span className="text-[8px] font-extrabold text-slate-600 uppercase">{seg.mode}</span>
+                                    </div>
+                                  </React.Fragment>
+                                ))}
+                              </div>
+
+                              <div className="flex justify-between font-extrabold text-slate-800 text-center gap-1">
+                                <span className="truncate flex-1 text-left">{selectedRoute.segments[0]?.fromStopName || 'Start'}</span>
+                                <span className="text-slate-400">➔</span>
+                                <span className="truncate flex-1 text-right">{selectedRoute.segments[selectedRoute.segments.length - 1]?.toStopName || 'End'}</span>
+                              </div>
+                              
+                              <div className="flex justify-between text-[10px] text-slate-400 font-bold border-t border-slate-50 pt-2">
+                                <span>Validity Countdown</span>
+                                <span className="font-mono text-jaipur-pink">{formatValidityTime(validitySeconds)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive SVG live progress map */}
+                        <div className="mt-1 shadow-sm rounded-2xl overflow-hidden border border-slate-200">
+                          <InteractiveMaaSMap 
+                            selectedRoute={selectedRoute} 
+                            showPhase2={store.twinLayers.phase2}
+                            userLocation={store.userLocation}
+                            height={220}
+                          />
                         </div>
                       </div>
-
-                      {/* Map Live Progress */}
-                      <div className="rounded-2xl border border-slate-200 overflow-hidden relative h-[220px] bg-white mt-1 shadow-sm">
-                        <div id="google-map-tracking" className="w-full h-full" style={{ minHeight: '220px' }} />
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* TAB 4: WALLET */}
                   {store.citizenScreen === 'wallet' && (
-                    <div className="flex-grow flex flex-col gap-4">
+                    <div className="flex-grow flex flex-col gap-4.5">
                       <div className="mt-2.5">
-                        <span className="text-[9px] text-slate-400 uppercase font-black">Open-Loop NCMC</span>
-                        <h2 className="text-lg font-black text-slate-900">Google Wallet Standard</h2>
+                        <span className="text-[9px] text-slate-400 uppercase font-black">Open-Loop Wallet Gateway</span>
+                        <h2 className="text-lg font-black text-slate-900">Mobility Card &amp; Ledger</h2>
+                      </div>
+
+                      {/* Black/Gold Premium RuPay NCMC Card Graphic */}
+                      <div className="relative bg-gradient-to-br from-[#1E1E1E] via-[#2D2D2D] to-[#121212] text-white p-4.5 rounded-2xl shadow-xl aspect-[1.75/1] flex flex-col justify-between overflow-hidden border border-[#D4AF37]/30">
+                        {/* Gold Chip / NFC symbol */}
+                        <div className="flex justify-between items-start z-10">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8.5 h-6 bg-[#D4AF37]/25 rounded border border-[#D4AF37]/50 relative overflow-hidden flex flex-col justify-around p-0.5">
+                              <div className="h-px bg-[#D4AF37]/40 w-full" />
+                              <div className="h-px bg-[#D4AF37]/40 w-full" />
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[#D4AF37] font-extrabold uppercase tracking-widest block leading-none">NCMC PASS</span>
+                              <span className="text-[7px] text-slate-400 font-bold block mt-0.5 leading-none">Co-Brand JUMTA</span>
+                            </div>
+                          </div>
+                          <span className="text-[12px]">📶</span>
+                        </div>
+                        <div className="z-10">
+                          <span className="text-[8px] text-slate-400 uppercase tracking-wider block">Wallet Balance</span>
+                          <span className="text-2xl font-black tracking-tight text-[#D4AF37]">₹{store.walletBalance}</span>
+                          <span className="text-[9px] font-mono tracking-widest text-slate-500 block mt-0.5">8295 4401 9904 8871</span>
+                        </div>
+                        <div className="flex justify-between items-end border-t border-slate-800/80 pt-2 text-[8px] text-slate-400 z-10">
+                          <span className="font-semibold text-slate-400">Jaipur Unified Mobility Auth</span>
+                          <span className="font-extrabold text-[#D4AF37]">RuPay Gold</span>
+                        </div>
                       </div>
 
                       {/* Recharge quick card */}
                       <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-3">
-                        <span className="text-[9px] text-slate-400 uppercase font-bold">Wallet Top-up</span>
+                        <span className="text-[9px] text-slate-400 uppercase font-black">Fast Card Top-up</span>
                         <div className="flex gap-2">
                           {['100', '200', '500'].map(amt => (
                             <button 
                               key={amt}
                               onClick={() => setRechargeAmt(amt)}
                               className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${
-                                rechargeAmt === amt ? 'bg-jaipur-pink/15 border-jaipur-pink text-jaipur-pink' : 'bg-slate-50 border-slate-200 text-slate-500'
+                                rechargeAmt === amt ? 'bg-jaipur-pink/15 border-jaipur-pink text-jaipur-pink font-extrabold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                               }`}
                             >
                               +₹{amt}
@@ -1322,23 +1670,48 @@ export default function App() {
                           ))}
                         </div>
                         <button 
-                          onClick={() => store.rechargeWallet(parseInt(rechargeAmt))}
-                          className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
+                          onClick={() => {
+                            store.rechargeWallet(parseInt(rechargeAmt));
+                            alert(`Recharged ₹${rechargeAmt} successfully!`);
+                          }}
+                          className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer shadow-sm"
                         >
-                          Recharge via Unified UPI
+                          Recharge via Unified UPI Link
                         </button>
                       </div>
 
-                      {/* Reward Points */}
-                      <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex justify-between items-center">
+                      {/* Recharts monthly savings ledger */}
+                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-2.5">
+                        <div>
+                          <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">MaaS Ledger</span>
+                          <h3 className="text-xs font-bold text-slate-850 mt-0.5">Your monthly savings (vs Cab/Car)</h3>
+                        </div>
+                        <div className="h-32 w-full pr-4 mt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={[
+                              { name: 'Jan', Savings: 320 },
+                              { name: 'Feb', Savings: 460 },
+                              { name: 'Mar', Savings: 620 },
+                              { name: 'Apr', Savings: 740 },
+                              { name: 'May', Savings: 890 }
+                            ]}>
+                              <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                              <Bar dataKey="Savings" fill="#D65A6F" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Travel Rewards node */}
+                      <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <Award className="w-4 h-4 text-jaipur-pink" />
                           <div>
-                            <h4 className="text-xs font-bold text-slate-800">Travel Reward Points</h4>
-                            <p className="text-[9px] text-slate-400">1,240 points available</p>
+                            <h4 className="text-xs font-black text-slate-800">Jaipur Green Points</h4>
+                            <p className="text-[9px] text-slate-400">1,240 carbon-saver points</p>
                           </div>
                         </div>
-                        <span className="text-xs font-bold text-jaipur-pink">Redeem</span>
+                        <span className="text-xs font-black text-jaipur-pink hover:underline cursor-pointer">Redeem</span>
                       </div>
                     </div>
                   )}
@@ -1347,28 +1720,34 @@ export default function App() {
                   {store.citizenScreen === 'profile' && (
                     <div className="flex-grow flex flex-col gap-3">
                       <div className="mt-2.5">
-                        <span className="text-[9px] text-slate-400 uppercase font-black">Configure App</span>
+                        <span className="text-[9px] text-slate-400 uppercase font-black">Configure citizen profile</span>
                         <h2 className="text-lg font-black text-slate-900">Your Settings</h2>
                       </div>
 
                       <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-2 text-xs">
                         <div className="flex justify-between items-center py-1">
                           <span className="text-slate-500 font-medium">Full Name</span>
-                          <span className="font-bold text-slate-800">{store.userProfile?.name}</span>
+                          <span className="font-extrabold text-slate-800">{store.userProfile?.name}</span>
                         </div>
                         <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 py-1">
                           <span className="text-slate-500 font-medium">Category Concession</span>
-                          <span className="font-bold text-slate-800">{store.userProfile?.category}</span>
+                          <span className="font-extrabold text-slate-800">{store.userProfile?.category}</span>
                         </div>
                         <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 py-1">
                           <span className="text-slate-500 font-medium">Language Preference</span>
-                          <span className="font-bold text-slate-800">{store.userProfile?.language === 'hi' ? 'Hindi' : 'English'}</span>
+                          <span className="font-extrabold text-slate-800">{store.userProfile?.language === 'hi' ? 'Hindi (हिन्दी)' : 'English'}</span>
                         </div>
+                        {store.userLocation && (
+                          <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 py-1">
+                            <span className="text-slate-500 font-medium">Primary Hub coordinates</span>
+                            <span className="font-mono text-[10px] text-slate-800">{store.userLocation.lat.toFixed(4)}°, {store.userLocation.lng.toFixed(4)}°</span>
+                          </div>
+                        )}
                       </div>
 
                       <button 
                         onClick={() => store.logOut()}
-                        className="w-full bg-red-100 text-red-600 py-3 rounded-xl text-xs font-bold hover:bg-red-200 cursor-pointer mt-4"
+                        className="w-full bg-red-50 border border-red-150 text-red-650 py-3 rounded-xl text-xs font-bold hover:bg-red-100 cursor-pointer mt-4"
                       >
                         Log Out / Change Account
                       </button>
@@ -1378,7 +1757,7 @@ export default function App() {
                   {/* AUXILIARY SCREENS LINKED BY NAVIGATION */}
                   {store.citizenScreen === 'ai_assistant' && (
                     <div className="flex-grow flex flex-col justify-between gap-3">
-                      <div className="mt-2">
+                      <div className="mt-2.5">
                         <span className="text-[9px] text-slate-400 uppercase font-black">AI Guide Bot</span>
                         <h2 className="text-base font-black text-slate-900 flex items-center gap-1.5">
                           <span>JUMP Assistant</span>
@@ -1392,7 +1771,7 @@ export default function App() {
                             key={idx}
                             className={`max-w-[85%] p-2.5 rounded-2xl text-[10px] leading-relaxed ${
                               msg.sender === 'user' 
-                                ? 'bg-slate-900 text-white ml-auto rounded-tr-none shadow-sm' 
+                                ? 'bg-slate-900 text-white ml-auto rounded-tr-none shadow-sm font-bold' 
                                 : 'bg-white border border-slate-200 text-slate-700 mr-auto rounded-tl-none shadow-sm'
                             }`}
                           >
@@ -1408,12 +1787,60 @@ export default function App() {
                           placeholder="Ask routes in English or Hindi..."
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
-                          className="flex-grow bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none"
+                          className="flex-grow bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-850 focus:outline-none focus:border-jaipur-pink"
                         />
-                        <button type="submit" className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">
+                        <button type="submit" className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer">
                           Send
                         </button>
                       </form>
+                    </div>
+                  )}
+
+                  {/* EMERGENCY SOS FULL SCREEN OVERLAY */}
+                  {showSOSOverlay && (
+                    <div className="absolute inset-0 bg-red-950/95 z-50 flex flex-col justify-between p-6 text-white animate-fade-in rounded-2xl">
+                      <div className="flex flex-col items-center text-center gap-4 mt-8">
+                        <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center animate-pulse border-4 border-red-500">
+                          <span className="text-xl">⚠️</span>
+                        </div>
+                        <h2 className="text-xl font-black tracking-tight text-red-500">EMERGENCY SOS ACTIVE</h2>
+                        <p className="text-xs text-slate-300 max-w-xs">
+                          Your live telemetry, position, and ID have been dispatched to Jaipur Police &amp; JUMTA Security.
+                        </p>
+                      </div>
+
+                      <div className="bg-red-900/40 border border-red-500/30 p-4 rounded-2xl flex flex-col gap-2.5 text-xs text-left">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Current GPS Coordinate:</span>
+                          <span className="font-mono font-bold text-white">
+                            {store.userLocation ? `${store.userLocation.lat.toFixed(4)}° N, ${store.userLocation.lng.toFixed(4)}° E` : '26.8770° N, 75.7540° E'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Nearest stop / stand:</span>
+                          <span className="font-bold text-white">{selectedStartStop?.nameEn || 'Mansarovar Station'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Citizen ID:</span>
+                          <span className="font-mono font-bold text-white">JUMP-8295</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <a 
+                          href="tel:112"
+                          className="w-full bg-red-650 hover:bg-red-700 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md text-center"
+                        >
+                          <Phone className="w-4 h-4" />
+                          <span>Call Jaipur Police (112)</span>
+                        </a>
+                        <button 
+                          onClick={() => setShowSOSOverlay(false)}
+                          className="w-full bg-transparent border border-slate-500 text-slate-300 font-bold py-3 rounded-xl text-xs hover:bg-slate-800 transition-all cursor-pointer"
+                        >
+                          Cancel SOS Alert
+                        </button>
+                      </div>
                     </div>
                   )}
 

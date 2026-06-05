@@ -2,7 +2,7 @@ import { JAIPUR_STOPS, getDistanceKm } from './data';
 import type { TransitStop } from './data';
 
 export interface RouteSegment {
-  mode: 'METRO' | 'BUS' | 'AUTO' | 'WALK';
+  mode: 'METRO' | 'BUS' | 'AUTO' | 'WALK' | 'CYCLE';
   routeId?: string;
   routeName?: string;
   fromStopName: string;
@@ -16,7 +16,7 @@ export interface RouteSegment {
 
 export interface OptimizedRoute {
   id: string;
-  type: 'RECOMMENDED' | 'PT_ONLY' | 'FAST_PRIVATE';
+  type: 'RECOMMENDED' | 'CHEAPEST' | 'FASTEST' | 'LEAST_WALKING' | 'GREENEST' | 'PT_ONLY' | 'FAST_PRIVATE';
   score: number; // 0 - 100
   segments: RouteSegment[];
   totalTime: number;
@@ -34,6 +34,34 @@ export interface OptimizedRoute {
 // ----------------------------------------------------
 export function getHaversineHeuristic(stopA: TransitStop, stopB: TransitStop): number {
   return getDistanceKm(stopA.lat, stopA.lng, stopB.lat, stopB.lng);
+}
+
+// ----------------------------------------------------
+// LAYER 2: 5-Criteria MaaS Score Engine
+// ----------------------------------------------------
+export function calculateMaaSScore(
+  timeMins: number,
+  fareRs: number,
+  walkingKm: number,
+  transfers: number,
+  congestion: number
+): number {
+  // Normalize each factor to 0-100 score
+  const timeScore = Math.max(0, 100 - timeMins * 1.2);
+  const fareScore = Math.max(0, 100 - fareRs * 1.5);
+  const walkingScore = Math.max(0, 100 - walkingKm * 20);
+  const transfersScore = Math.max(0, 100 - transfers * 25);
+  const reliabilityScore = Math.max(0, 100 - congestion);
+
+  // Apply new MaaS Weights: Time(40%), Fare(25%), Walking(15%), Transfers(10%), Reliability/Congestion(10%)
+  const totalScore =
+    timeScore * 0.40 +
+    fareScore * 0.25 +
+    walkingScore * 0.15 +
+    transfersScore * 0.10 +
+    reliabilityScore * 0.10;
+
+  return Math.max(30, Math.min(99, Math.round(totalScore)));
 }
 
 // ----------------------------------------------------
@@ -92,207 +120,304 @@ export function calculateMaaSRoutes(
   endStopId: string,
   peakFactor: number,
   weather: 'CLEAR' | 'RAIN' | 'HOT_WAVE',
-  event: 'NONE' | 'FESTIVAL' | 'EXAM' | 'MELA'
+  event: 'NONE' | 'FESTIVAL' | 'EXAM' | 'MELA',
+  collegeMode = false,
+  touristMode = false
 ): OptimizedRoute[] {
   const startStop = JAIPUR_STOPS.find(s => s.id === startStopId) || JAIPUR_STOPS[0];
   const endStop = JAIPUR_STOPS.find(s => s.id === endStopId) || JAIPUR_STOPS[1];
 
   const aiOutput = runAIAdaptiveEngine(peakFactor, weather, event);
   const congestionBase = aiOutput.congestionFactor;
-
-  // Let's generate a list of routes simulating the multi-criteria frontier.
-  // In a real system, this is computed over the full intermodal network graph using RAPTOR or Multi-Criteria Dijkstra.
-  // Here we dynamically construct valid Pareto routes based on coordinate checks and routes.
-
   const directDistance = getDistanceKm(startStop.lat, startStop.lng, endStop.lat, endStop.lng);
 
   // Helper to generate route options
   const generateRouteOption = (
-    type: 'RECOMMENDED' | 'PT_ONLY' | 'FAST_PRIVATE'
+    type: 'RECOMMENDED' | 'CHEAPEST' | 'FASTEST' | 'LEAST_WALKING' | 'GREENEST'
   ): OptimizedRoute => {
     const segments: RouteSegment[] = [];
+    let metroConcession = collegeMode ? 0.5 : 1.0;
 
-    // Let's compute segments
-    if (type === 'PT_ONLY') {
-      // Public Transport heavy (Metro + Bus)
-      // Segment 1: Walk to nearest transit (or direct if already transit)
-      const transitDistance = directDistance;
-      const busTime = Math.round(transitDistance * 2.5 + 4);
-      const fareBus = Math.max(10, Math.min(25, Math.round(transitDistance * 2.2)));
-
-      segments.push({
-        mode: 'BUS',
-        routeName: 'JCTSL Route 3',
-        fromStopName: startStop.nameEn,
-        toStopName: endStop.nameEn,
-        distanceKm: transitDistance,
-        timeMins: busTime,
-        fare: fareBus,
-        carbonKg: Number((transitDistance * 0.04).toFixed(2)),
-        congestion: Math.min(100, Math.round(congestionBase * 1.1)),
-      });
-
-      const totalTime = segments.reduce((sum, s) => sum + s.timeMins, 0);
-      const totalFare = segments.reduce((sum, s) => sum + s.fare, 0);
-      const totalCarbon = segments.reduce((sum, s) => sum + s.carbonKg, 0);
-
-      // MaaS Score weights: Fare(25%), Time(30%), Transfers(15%), Walking(10%), Carbon(10%), Congestion(10%)
-      const score = Math.round(
-        (100 - (totalFare * 1.5)) * 0.25 +
-        (100 - (totalTime * 1.2)) * 0.30 +
-        (100) * 0.15 + // 0 transfers
-        (100) * 0.10 + // 0 walking
-        (100) * 0.10 + // Low carbon
-        (100 - congestionBase) * 0.10
-      );
-
-      return {
-        id: `route_pt_${startStopId}_${endStopId}`,
-        type,
-        score: Math.max(40, Math.min(98, score)),
-        segments,
-        totalTime,
-        totalFare,
-        originalFare: totalFare,
-        totalWalkingKm: 0,
-        totalTransfers: 0,
-        totalCarbon: Number(totalCarbon.toFixed(2)),
-        avgCongestion: Math.round(congestionBase * 1.1),
-        savingPercent: 0,
-      };
-
-    } else if (type === 'FAST_PRIVATE') {
-      // Auto / Taxi Heavy (Rapido/Ola/Uber)
-      const rideTime = Math.round(directDistance * 2.0);
-      const fareRide = Math.round(directDistance * 10 + 25); // meter rate ₹25 base + ₹10/km
-
+    if (type === 'FASTEST') {
+      // Direct Private Auto/Cab
+      const rideTime = Math.round(directDistance * 1.8);
+      const rawFare = Math.round(directDistance * 12 + 30);
       segments.push({
         mode: 'AUTO',
-        routeName: 'Auto / Ride-Hailing',
+        routeName: 'Direct Cab / Auto',
         fromStopName: startStop.nameEn,
         toStopName: endStop.nameEn,
         distanceKm: directDistance,
         timeMins: rideTime,
-        fare: fareRide,
-        carbonKg: Number((directDistance * 0.15).toFixed(2)), // Higher footprint
-        congestion: congestionBase,
+        fare: rawFare,
+        carbonKg: Number((directDistance * 0.14).toFixed(2)),
+        congestion: congestionBase
       });
 
-      const score = Math.round(
-        (100 - (fareRide * 0.5)) * 0.25 +
-        (100 - (rideTime * 0.8)) * 0.30 +
-        (100) * 0.15 +
-        (100) * 0.10 +
-        (30) * 0.10 + // High carbon penalty
-        (100 - congestionBase) * 0.10
-      );
-
       return {
-        id: `route_priv_${startStopId}_${endStopId}`,
+        id: `algo_fastest_${startStopId}_${endStopId}`,
         type,
-        score: Math.max(30, Math.min(95, score)),
+        score: calculateMaaSScore(rideTime, rawFare, 0, 0, congestionBase),
         segments,
         totalTime: rideTime,
-        totalFare: fareRide,
-        originalFare: fareRide,
+        totalFare: rawFare,
+        originalFare: rawFare,
         totalWalkingKm: 0,
         totalTransfers: 0,
-        totalCarbon: Number((directDistance * 0.15).toFixed(2)),
+        totalCarbon: Number((directDistance * 0.14).toFixed(2)),
         avgCongestion: congestionBase,
-        savingPercent: 0,
+        savingPercent: 0
       };
 
-    } else {
-      // RECOMMENDED: Intermodal Hybrid Route (e.g. Auto first-mile + Metro + Walking last-mile)
-      // Demonstrates Layer 5 Dynamic Integrated Fare and multi-modal routing logic
-      const firstMileDist = Math.max(1.0, directDistance * 0.2);
-      const metroDist = Math.max(2.0, directDistance * 0.65);
-      const lastMileDist = Math.max(0.5, directDistance * 0.15);
+    } else if (type === 'CHEAPEST') {
+      // Public Bus transit (Low fare, higher walking)
+      const busTime = Math.round(directDistance * 2.8 + 6);
+      const rawFare = Math.max(10, Math.min(20, Math.round(directDistance * 1.8)));
+      const walkingKm = 0.4;
+      const walkTime = 5;
 
-      const segment1Time = Math.round(firstMileDist * 2.2);
-      const segment2Time = Math.round(metroDist * 1.5);
-      const segment3Time = Math.round(lastMileDist * 12); // walking: 12 min per km
+      segments.push({
+        mode: 'WALK',
+        routeName: 'Walk to Bus Stop',
+        fromStopName: startStop.nameEn,
+        toStopName: 'Nearest JCTSL Stop',
+        distanceKm: 0.2,
+        timeMins: 2,
+        fare: 0,
+        carbonKg: 0,
+        congestion: 0
+      });
 
-      const fareAuto = Math.round(firstMileDist * 10 + 15);
-      const fareMetro = Math.max(10, Math.min(40, Math.round(metroDist * 2.5)));
-      
-      const rawFare = fareAuto + fareMetro;
-      
-      // Dynamic Fare Engine integration: Apply 20% discount on combined ticket!
-      const discount = 0.20; 
-      const finalFare = Math.round(rawFare * (1 - discount));
+      segments.push({
+        mode: 'BUS',
+        routeName: 'JCTSL Route 3 Bus',
+        fromStopName: 'Nearest JCTSL Stop',
+        toStopName: 'Destination Bus Stop',
+        distanceKm: directDistance,
+        timeMins: busTime,
+        fare: rawFare,
+        carbonKg: Number((directDistance * 0.03).toFixed(2)),
+        congestion: Math.round(congestionBase * 1.1)
+      });
+
+      segments.push({
+        mode: 'WALK',
+        routeName: 'Walk to Destination',
+        fromStopName: 'Destination Bus Stop',
+        toStopName: endStop.nameEn,
+        distanceKm: 0.2,
+        timeMins: 3,
+        fare: 0,
+        carbonKg: 0,
+        congestion: 0
+      });
+
+      const totalTime = busTime + walkTime;
+      const totalFare = rawFare;
+
+      return {
+        id: `algo_cheapest_${startStopId}_${endStopId}`,
+        type,
+        score: calculateMaaSScore(totalTime, totalFare, walkingKm, 1, Math.round(congestionBase * 1.1)),
+        segments,
+        totalTime,
+        totalFare,
+        originalFare: totalFare,
+        totalWalkingKm: walkingKm,
+        totalTransfers: 1,
+        totalCarbon: Number((directDistance * 0.03).toFixed(2)),
+        avgCongestion: Math.round(congestionBase * 1.1),
+        savingPercent: 0
+      };
+
+    } else if (type === 'LEAST_WALKING') {
+      // Multi-modal auto first-mile feeder + Metro direct
+      const autoDist = 1.2;
+      const metroDist = Math.max(1.0, directDistance - autoDist);
+
+      const autoFare = 20;
+      const metroFare = Math.round(Math.max(10, Math.min(30, metroDist * 2.5)) * metroConcession);
+      const combinedFare = autoFare + metroFare;
+
+      const autoTime = Math.round(autoDist * 2);
+      const metroTime = Math.round(metroDist * 1.4);
+      const totalTime = autoTime + metroTime + 3; // 3 min transfer
 
       segments.push({
         mode: 'AUTO',
         routeName: 'E-Rickshaw Feeder',
         fromStopName: startStop.nameEn,
-        toStopName: 'Metro Transit Point',
-        distanceKm: firstMileDist,
-        timeMins: segment1Time,
-        fare: fareAuto,
-        carbonKg: Number((firstMileDist * 0.03).toFixed(2)), // Clean EV
-        congestion: congestionBase,
+        toStopName: 'JMRC Metro Gateway',
+        distanceKm: autoDist,
+        timeMins: autoTime,
+        fare: autoFare,
+        carbonKg: 0.02,
+        congestion: congestionBase
       });
 
       segments.push({
         mode: 'METRO',
-        routeName: 'Metro Orange Line',
-        fromStopName: 'Metro Transit Point',
-        toStopName: 'Metro Alighting Point',
+        routeName: 'JMRC Metro Line',
+        fromStopName: 'JMRC Metro Gateway',
+        toStopName: endStop.nameEn,
         distanceKm: metroDist,
-        timeMins: segment2Time,
-        fare: fareMetro,
-        carbonKg: Number((metroDist * 0.01).toFixed(2)), // ultra-low carbon
-        congestion: 10, // Metro is traffic-free
+        timeMins: metroTime,
+        fare: metroFare,
+        carbonKg: 0.01,
+        congestion: 0
+      });
+
+      return {
+        id: `algo_least_walk_${startStopId}_${endStopId}`,
+        type,
+        score: calculateMaaSScore(totalTime, combinedFare, 0, 1, Math.round(congestionBase * 0.5)),
+        segments,
+        totalTime,
+        totalFare: combinedFare,
+        originalFare: combinedFare,
+        totalWalkingKm: 0,
+        totalTransfers: 1,
+        totalCarbon: 0.03,
+        avgCongestion: Math.round(congestionBase * 0.5),
+        savingPercent: collegeMode ? 20 : 0
+      };
+
+    } else if (type === 'GREENEST') {
+      // Public Metro + Cycle share / Walking
+      const metroDist = directDistance * 0.8;
+      const cycleDist = directDistance * 0.2;
+
+      const metroFare = Math.round(Math.max(10, Math.min(35, metroDist * 2.5)) * metroConcession);
+      const cycleFare = 5;
+      const combinedFare = metroFare + cycleFare;
+
+      const metroTime = Math.round(metroDist * 1.4);
+      const cycleTime = Math.round(cycleDist * 4);
+      const totalTime = metroTime + cycleTime + 2;
+
+      segments.push({
+        mode: 'METRO',
+        routeName: 'JMRC Metro Line',
+        fromStopName: startStop.nameEn,
+        toStopName: 'Public Cycle Dock',
+        distanceKm: metroDist,
+        timeMins: metroTime,
+        fare: metroFare,
+        carbonKg: 0.01,
+        congestion: 0
+      });
+
+      segments.push({
+        mode: 'CYCLE',
+        routeName: 'JUMTA Shared Cycle',
+        fromStopName: 'Public Cycle Dock',
+        toStopName: endStop.nameEn,
+        distanceKm: cycleDist,
+        timeMins: cycleTime,
+        fare: cycleFare,
+        carbonKg: 0,
+        congestion: 0
+      });
+
+      return {
+        id: `algo_greenest_${startStopId}_${endStopId}`,
+        type,
+        score: calculateMaaSScore(totalTime, combinedFare, 0, 1, 0),
+        segments,
+        totalTime,
+        totalFare: combinedFare,
+        originalFare: combinedFare,
+        totalWalkingKm: 0,
+        totalTransfers: 1,
+        totalCarbon: 0.01,
+        avgCongestion: 0,
+        savingPercent: 15
+      };
+
+    } else {
+      // RECOMMENDED: Intermodal Hybrid Route with integrated discount
+      const firstMile = Math.max(0.8, directDistance * 0.15);
+      const metroLink = Math.max(1.5, directDistance * 0.7);
+      const lastMile = Math.max(0.4, directDistance * 0.15);
+
+      const autoFare = Math.round(firstMile * 10 + 10);
+      const metroFare = Math.round(Math.max(10, Math.min(40, metroLink * 2.5)) * metroConcession);
+      const walkFare = 0;
+
+      const rawFare = autoFare + metroFare + walkFare;
+      const discount = 0.20; // 20% combined intermodal discount
+      const finalFare = Math.round(rawFare * (1 - discount));
+
+      const autoTime = Math.round(firstMile * 2);
+      const metroTime = Math.round(metroLink * 1.3);
+      const walkTime = Math.round(lastMile * 12);
+      const totalTime = autoTime + metroTime + walkTime + 3; // includes 3 min buffer
+
+      segments.push({
+        mode: 'AUTO',
+        routeName: 'E-Rickshaw Feeder',
+        fromStopName: startStop.nameEn,
+        toStopName: 'MaaS Transit Node',
+        distanceKm: firstMile,
+        timeMins: autoTime,
+        fare: autoFare,
+        carbonKg: 0.02,
+        congestion: congestionBase
+      });
+
+      segments.push({
+        mode: 'METRO',
+        routeName: 'JMRC Metro System',
+        fromStopName: 'MaaS Transit Node',
+        toStopName: 'Alighting Station',
+        distanceKm: metroLink,
+        timeMins: metroTime,
+        fare: metroFare,
+        carbonKg: 0.01,
+        congestion: 0
       });
 
       segments.push({
         mode: 'WALK',
-        routeName: 'Walking Route',
-        fromStopName: 'Metro Alighting Point',
+        routeName: 'Walk to Destination',
+        fromStopName: 'Alighting Station',
         toStopName: endStop.nameEn,
-        distanceKm: lastMileDist,
-        timeMins: segment3Time,
+        distanceKm: lastMile,
+        timeMins: walkTime,
         fare: 0,
         carbonKg: 0,
-        congestion: 0,
+        congestion: 0
       });
 
-      const totalTime = segment1Time + segment2Time + segment3Time + 4; // 4 mins transfer buffer
-      const totalCarbon = segments.reduce((sum, s) => sum + s.carbonKg, 0);
-
-      const score = Math.round(
-        (100 - (finalFare * 1.2)) * 0.25 +
-        (100 - (totalTime * 0.9)) * 0.30 +
-        (100 - 15) * 0.15 + // 1 transfer penalty
-        (100 - lastMileDist * 20) * 0.10 + // walking penalty
-        (95) * 0.10 + // Good carbon index
-        (100 - congestionBase * 0.3) * 0.10 // avoid gridlock since on metro
-      );
+      if (touristMode) {
+        // Under tourist mode, the recommended path highlights sightseeing routes
+        segments[1].routeName = 'Jaipur Heritage Express';
+      }
 
       return {
-        id: `route_recom_${startStopId}_${endStopId}`,
+        id: `algo_recom_${startStopId}_${endStopId}`,
         type,
-        score: Math.max(50, Math.min(99, score)),
+        score: calculateMaaSScore(totalTime, finalFare, lastMile, 2, Math.round(congestionBase * 0.3)),
         segments,
         totalTime,
         totalFare: finalFare,
         originalFare: rawFare,
-        totalWalkingKm: Number(lastMileDist.toFixed(1)),
-        totalTransfers: 1,
-        totalCarbon: Number(totalCarbon.toFixed(2)),
-        avgCongestion: Math.round(congestionBase * 0.4),
-        savingPercent: Math.round(discount * 100),
+        totalWalkingKm: Number(lastMile.toFixed(1)),
+        totalTransfers: 2,
+        totalCarbon: 0.03,
+        avgCongestion: Math.round(congestionBase * 0.3),
+        savingPercent: Math.round(discount * 100)
       };
     }
   };
 
   const routes = [
     generateRouteOption('RECOMMENDED'),
-    generateRouteOption('PT_ONLY'),
-    generateRouteOption('FAST_PRIVATE')
+    generateRouteOption('CHEAPEST'),
+    generateRouteOption('FASTEST'),
+    generateRouteOption('LEAST_WALKING'),
+    generateRouteOption('GREENEST')
   ];
 
-  // Sort routes by Pareto dominance / highest score first
   return routes.sort((a, b) => b.score - a.score);
 }

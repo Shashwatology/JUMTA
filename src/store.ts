@@ -59,6 +59,15 @@ interface MaaSState {
   triggerSOS: () => void;
   resetSOS: () => void;
 
+  userLocation: { lat: number; lng: number; nameEn: string } | null;
+  setUserLocation: (loc: { lat: number; lng: number; nameEn: string } | null) => void;
+  activePass: string | null;
+  setActivePass: (passType: string | null) => void;
+  collegeMode: boolean;
+  setCollegeMode: (val: boolean) => void;
+  touristMode: boolean;
+  setTouristMode: (val: boolean) => void;
+
   // Digital Twin specific active layers
   twinLayers: {
     road: boolean;
@@ -115,8 +124,8 @@ export const useMaaSStore = create<MaaSState>((set, get) => ({
   lastSearchExecuted: false,
 
   triggerSearch: () => {
-    const { startStopId, endStopId, peakHourFactor, weather, event } = get();
-    const routes = routingService.calculateRoutes(startStopId, endStopId, peakHourFactor, weather, event);
+    const { startStopId, endStopId, peakHourFactor, weather, event, collegeMode, touristMode } = get();
+    const routes = routingService.calculateRoutes(startStopId, endStopId, peakHourFactor, weather, event, true, collegeMode, touristMode);
     const ai = predictionService.getTransitNetworkPredictions(peakHourFactor, weather, event);
     set({
       calculatedRoutes: routes,
@@ -170,4 +179,23 @@ export const useMaaSStore = create<MaaSState>((set, get) => ({
       [layer]: !state.twinLayers[layer],
     }
   })),
+
+  userLocation: null,
+  setUserLocation: (loc) => set({ userLocation: loc }),
+  activePass: null,
+  setActivePass: (passType) => set({ activePass: passType }),
+  collegeMode: false,
+  setCollegeMode: (val) => {
+    set({ collegeMode: val });
+    if (get().lastSearchExecuted) {
+      get().triggerSearch();
+    }
+  },
+  touristMode: false,
+  setTouristMode: (val) => {
+    set({ touristMode: val });
+    if (get().lastSearchExecuted) {
+      get().triggerSearch();
+    }
+  },
 }));
