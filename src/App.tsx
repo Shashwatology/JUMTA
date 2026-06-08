@@ -193,7 +193,16 @@ export default function App() {
         const ipRes = await fetch('https://ipapi.co/json/');
         const ipJson = await ipRes.json();
         if (ipJson && typeof ipJson.latitude === 'number' && typeof ipJson.longitude === 'number') {
-          fetchWeatherAndLocation(ipJson.latitude, ipJson.longitude, false);
+          const lat = ipJson.latitude;
+          const lng = ipJson.longitude;
+          // Jaipur region boundary constraint check
+          const isWithinJaipur = lat >= 26.75 && lat <= 27.05 && lng >= 75.68 && lng <= 75.92;
+          if (isWithinJaipur) {
+            fetchWeatherAndLocation(lat, lng, false);
+          } else {
+            console.warn("IP Geolocation returned coordinates outside Jaipur map bounds. Using Jaipur Mansarovar default.");
+            fetchWeatherAndLocation(26.8770, 75.7540, true);
+          }
         } else {
           throw new Error("Invalid IP geocode response format");
         }

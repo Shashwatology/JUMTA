@@ -137,18 +137,18 @@ export const routingService = {
           congestion: congestionBase
         });
 
-        const score = Math.round(
-          (100 - rideTime * 1.2) * 0.40 +
-          (100 - rawFare * 1.5) * 0.25 +
-          100 * 0.15 +
-          100 * 0.10 +
-          (100 - congestionBase) * 0.10
+        const score = routingService.calculateMaaSScore(
+          rideTime,
+          rawFare,
+          0,
+          0,
+          congestionBase
         );
 
         return {
           id: `route_fastest_${startId}_${endId}`,
           type,
-          score: Math.max(30, Math.min(99, score)),
+          score,
           segments,
           totalTime: rideTime,
           totalFare: rawFare,
@@ -206,18 +206,18 @@ export const routingService = {
         const totalTime = busTime + walkTime;
         const totalFare = rawFare;
 
-        const score = Math.round(
-          (100 - totalTime * 1.2) * 0.40 +
-          (100 - totalFare * 1.5) * 0.25 +
-          (100 - walkingKm * 20) * 0.15 +
-          75 * 0.10 + // 1 transfer
-          (100 - congestionBase * 1.1) * 0.10
+        const score = routingService.calculateMaaSScore(
+          totalTime,
+          totalFare,
+          walkingKm,
+          1,
+          congestionBase * 1.1
         );
 
         return {
           id: `route_cheapest_${startId}_${endId}`,
           type,
-          score: Math.max(30, Math.min(99, score)),
+          score,
           segments,
           totalTime,
           totalFare,
@@ -266,18 +266,18 @@ export const routingService = {
           congestion: 0
         });
 
-        const score = Math.round(
-          (100 - totalTime * 1.2) * 0.40 +
-          (100 - combinedFare * 1.5) * 0.25 +
-          100 * 0.15 + // 0 walking
-          75 * 0.10 + // 1 transfer
-          (100 - congestionBase * 0.5) * 0.10
+        const score = routingService.calculateMaaSScore(
+          totalTime,
+          combinedFare,
+          0,
+          1,
+          congestionBase * 0.5
         );
 
         return {
           id: `route_least_walk_${startId}_${endId}`,
           type,
-          score: Math.max(30, Math.min(99, score)),
+          score,
           segments,
           totalTime,
           totalFare: combinedFare,
@@ -326,18 +326,18 @@ export const routingService = {
           congestion: 0
         });
 
-        const score = Math.round(
-          (100 - totalTime * 1.2) * 0.40 +
-          (100 - combinedFare * 1.5) * 0.25 +
-          100 * 0.15 + // 0 walking
-          75 * 0.10 + // 1 transfer
-          100 * 0.10 // 0 congestion
+        const score = routingService.calculateMaaSScore(
+          totalTime,
+          combinedFare,
+          0,
+          1,
+          0
         );
 
         return {
           id: `route_greenest_${startId}_${endId}`,
           type,
-          score: Math.max(30, Math.min(99, score)),
+          score,
           segments,
           totalTime,
           totalFare: combinedFare,
@@ -408,18 +408,18 @@ export const routingService = {
           segments[1].routeName = 'Jaipur Heritage Express';
         }
 
-        const score = Math.round(
-          (100 - totalTime * 1.2) * 0.40 +
-          (100 - finalFare * 1.5) * 0.25 +
-          (100 - lastMile * 20) * 0.15 +
-          50 * 0.10 + // 2 transfers
-          (100 - congestionBase * 0.3) * 0.10
+        const score = routingService.calculateMaaSScore(
+          totalTime,
+          finalFare,
+          lastMile,
+          2,
+          congestionBase * 0.3
         );
 
         return {
           id: `route_recom_${startId}_${endId}`,
           type,
-          score: Math.max(30, Math.min(99, score)),
+          score,
           segments,
           totalTime,
           totalFare: finalFare,

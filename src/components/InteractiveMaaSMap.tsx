@@ -37,6 +37,9 @@ export const InteractiveMaaSMap: React.FC<MapProps> = ({
 
   // Helper to project GPS coordinates to SVG viewBox (0,0 to 500,600)
   const getXY = (lat: number, lng: number) => {
+    if (isNaN(lat) || isNaN(lng)) {
+      return { x: 0, y: 0 };
+    }
     const width = 500;
     const heightVal = 600;
     const x = ((lng - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng)) * width;
@@ -65,7 +68,7 @@ export const InteractiveMaaSMap: React.FC<MapProps> = ({
 
     if (progress < totalStops - 1) {
       // Forward
-      const index = Math.floor(progress);
+      const index = Math.min(totalStops - 2, Math.floor(progress));
       const fraction = progress - index;
       const start = stops[index];
       const end = stops[index + 1];
@@ -75,7 +78,7 @@ export const InteractiveMaaSMap: React.FC<MapProps> = ({
       };
     } else {
       // Backward
-      const index = Math.floor(cycleLength - progress);
+      const index = Math.min(totalStops - 2, Math.floor(cycleLength - progress));
       const fraction = (cycleLength - progress) - index;
       const start = stops[index + 1];
       const end = stops[index];
