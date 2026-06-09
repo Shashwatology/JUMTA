@@ -1,16 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Sora:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@300;400;500;600;700;800&family=Sora:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-jctsl-teal: #1D9E75;
-  --color-jctsl-light: #E5F6F0;
-  --color-jmrc-blue: #185FA5;
-  --color-jmrc-light: #E8F0F7;
-  --color-ipt-amber: #F2A900;
-  --color-ipt-light: #FEF6E5;
-  --color-coral-private: #FF5A5F;
-  --color-coral-light: #FFEBEB;
-  --color-heritage-pink: #E07A5F;
+  --color-jaipur-pink: #D65A6F;
+  --color-metro-blue: #185FA5;
+  --color-transit-green: #0FA971;
+  --color-mobility-amber: #F2A900;
+  --color-surface-base: #FFFFFF;
+  --color-surface-sand: #F8F7F5;
+  --color-text-main: #111827;
+  --color-text-muted: #6B7280;
   
   --font-sora: "Sora", sans-serif;
   --font-devanagari: "Noto Sans Devanagari", sans-serif;
@@ -18,82 +17,119 @@
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 font-sora antialiased overflow-x-hidden;
+    @apply bg-[#F4F2EE] text-[#111827] font-sora antialiased overflow-x-hidden;
   }
 }
 
-/* Scrollbar Customization */
+/* Custom Webkit Scrollbars (Clean, minimalist light style) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: #F1EFEA;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: #D8D4C7;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #C3BEB0;
 }
 
-/* Glassmorphism Styles */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Premium Light Sandstone Panel */
+.sand-panel {
+  background: #FFFFFF;
+  border: 1px solid #EAE6DC;
+  box-shadow: 0 4px 20px -2px rgba(139, 92, 26, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
 }
 
-.glass-panel-heavy {
-  background: rgba(10, 15, 30, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+.sand-panel-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sand-panel-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -4px rgba(139, 92, 26, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+  border-color: #D65A6F;
 }
 
-/* Custom Textures */
-.mesh-bg {
+/* Jaipur Traditional Block Printing Geometry Pattern Overlay */
+.block-print-bg {
+  background-color: #F8F7F5;
   background-image: 
-    radial-gradient(at 10% 20%, rgba(24, 95, 165, 0.15) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, rgba(29, 158, 117, 0.12) 0px, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(255, 90, 95, 0.1) 0px, transparent 50%);
-  background-attachment: fixed;
+    radial-gradient(#D65A6F 0.5px, transparent 0.5px), 
+    radial-gradient(#185FA5 0.5px, #F8F7F5 0.5px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  opacity: 0.12;
 }
 
-/* Pulse Glows */
-.pulse-glow-teal {
-  box-shadow: 0 0 15px rgba(29, 158, 117, 0.3);
+.block-print-subtle {
+  background-color: #FFFFFF;
+  background-image: 
+    radial-gradient(#D65A6F 0.4px, transparent 0.4px), 
+    radial-gradient(#EAE6DC 0.4px, #FFFFFF 0.4px);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  opacity: 0.07;
 }
 
-.pulse-glow-blue {
-  box-shadow: 0 0 15px rgba(24, 95, 165, 0.3);
+/* Hologram Shimmer Animation (Tactile boarding card feeling) */
+.hologram-shimmer {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  background-size: 200% 200%;
+  animation: shimmerFlow 4s ease-in-out infinite;
 }
 
-.pulse-glow-coral {
-  box-shadow: 0 0 15px rgba(255, 90, 95, 0.4);
+@keyframes shimmerFlow {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
-/* Phone Frame Simulator */
+/* Ticket validity countdown glow */
+.glow-pink-pulse {
+  box-shadow: 0 0 15px rgba(214, 90, 111, 0.15);
+  animation: glowPink 2s infinite alternate;
+}
+
+@keyframes glowPink {
+  0% {
+    box-shadow: 0 0 8px rgba(214, 90, 111, 0.1);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(214, 90, 111, 0.25);
+  }
+}
+
+/* Phone Simulator Viewport with Premium Light Accents */
 .phone-viewport {
   width: 100%;
   max-width: 412px;
   height: 840px;
-  border-radius: 40px;
-  border: 12px solid #0f172a;
+  border-radius: 44px;
+  border: 14px solid #1E2022;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 25px 60px -12px rgba(115, 105, 90, 0.25), 0 15px 30px -10px rgba(0, 0, 0, 0.1);
   position: relative;
-  background: #020617;
+  background: #F8F7F5;
+  transition: border-color 0.3s;
 }
 
 .phone-notch {
-  width: 150px;
-  height: 25px;
-  background: #0f172a;
-  border-bottom-left-radius: 18px;
-  border-bottom-right-radius: 18px;
+  width: 140px;
+  height: 28px;
+  background: #1E2022;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
   position: absolute;
   top: 0;
   left: 50%;
@@ -101,10 +137,29 @@
   z-index: 50;
 }
 
-/* Dribbble Style Floating Grid background */
-.grid-bg {
-  background-size: 40px 40px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+/* Micro-animations */
+.animate-spin-slow {
+  animation: spin 8s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
