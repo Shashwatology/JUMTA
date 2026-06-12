@@ -6,7 +6,7 @@ interface UserProfile {
   name: string;
   gender: string;
   age: string;
-  category: 'RESIDENT' | 'STUDENT' | 'TOURIST';
+  category: 'RESIDENT' | 'STUDENT' | 'TOURIST' | 'WOMEN' | 'ELDER';
   language: 'en' | 'hi';
 }
 
@@ -67,6 +67,10 @@ interface MaaSState {
   setCollegeMode: (val: boolean) => void;
   touristMode: boolean;
   setTouristMode: (val: boolean) => void;
+  womenMode: boolean;
+  setWomenMode: (val: boolean) => void;
+  elderMode: boolean;
+  setElderMode: (val: boolean) => void;
 
   // Digital Twin specific active layers
   twinLayers: {
@@ -124,8 +128,8 @@ export const useMaaSStore = create<MaaSState>((set, get) => ({
   lastSearchExecuted: false,
 
   triggerSearch: () => {
-    const { startStopId, endStopId, peakHourFactor, weather, event, collegeMode, touristMode } = get();
-    const routes = routingService.calculateRoutes(startStopId, endStopId, peakHourFactor, weather, event, true, collegeMode, touristMode);
+    const { startStopId, endStopId, peakHourFactor, weather, event, collegeMode, touristMode, womenMode, elderMode } = get();
+    const routes = routingService.calculateRoutes(startStopId, endStopId, peakHourFactor, weather, event, true, collegeMode, touristMode, womenMode, elderMode);
     const ai = predictionService.getTransitNetworkPredictions(peakHourFactor, weather, event);
     set({
       calculatedRoutes: routes,
@@ -194,6 +198,20 @@ export const useMaaSStore = create<MaaSState>((set, get) => ({
   touristMode: false,
   setTouristMode: (val) => {
     set({ touristMode: val });
+    if (get().lastSearchExecuted) {
+      get().triggerSearch();
+    }
+  },
+  womenMode: false,
+  setWomenMode: (val) => {
+    set({ womenMode: val });
+    if (get().lastSearchExecuted) {
+      get().triggerSearch();
+    }
+  },
+  elderMode: false,
+  setElderMode: (val) => {
+    set({ elderMode: val });
     if (get().lastSearchExecuted) {
       get().triggerSearch();
     }

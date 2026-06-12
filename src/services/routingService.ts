@@ -63,7 +63,9 @@ export const routingService = {
     event: 'NONE' | 'FESTIVAL' | 'EXAM' | 'MELA',
     includePhase2 = true,
     collegeMode = false,
-    touristMode = false
+    touristMode = false,
+    womenMode = false,
+    elderMode = false
   ): OptimizedRoute[] {
     let startStop = transitDataService.getStopById(startId, includePhase2);
     let endStop = transitDataService.getStopById(endId, includePhase2);
@@ -113,7 +115,14 @@ export const routingService = {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const directDistance = Number((R * c).toFixed(2));
 
-    const metroConcession = collegeMode ? 0.5 : 1.0;
+    let metroConcession = 1.0;
+    if (collegeMode) {
+      metroConcession = 0.5;
+    } else if (womenMode || elderMode) {
+      metroConcession = 0.75;
+    }
+
+    const busConcession = (womenMode || elderMode) ? 0.75 : 1.0;
 
     // Helper to generate route options
     const generateRoute = (
@@ -163,7 +172,7 @@ export const routingService = {
       } else if (type === 'CHEAPEST') {
         // Direct JCTSL Bus route with small walks on both ends
         const busTime = Math.round(directDistance * 2.8 + 6);
-        const rawFare = Math.max(10, Math.min(20, Math.round(directDistance * 1.8)));
+        const rawFare = Math.round(Math.max(10, Math.min(20, Math.round(directDistance * 1.8))) * busConcession);
         const walkingKm = 0.4;
         const walkTime = 5;
 
